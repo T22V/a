@@ -42,7 +42,7 @@
 
   <script>
     async function obtenerYProcesarEnlaces() {
-      const rawGistUrl = "https://gist.githubusercontent.com/2TV2/d8a2aa38e4a04c3ecdf51594ca9cf138/raw";
+      const rawGistUrl = "https://gist.githubusercontent.com/T22V/80b0b2d2e20ed0a455b66303b468e90b/raw";
       const statusElement = document.getElementById("status");
       const botonesContainer = document.getElementById("botones-container");
       
@@ -66,12 +66,13 @@
     }
 
     function mostrarBotones(input) {
-      const enlaces = input.split(/\n+/).filter(linea => linea.trim() !== "");
+      const lineas = input.split(/\n+/).filter(linea => linea.trim() !== "");
       const botonesContainer = document.getElementById("botones-container");
       let contador = 1;
 
-      enlaces.forEach(enlace => {
-        const match = enlace.match(/acestream:\?content_id=([a-fA-F0-9]+)/);
+      lineas.forEach(linea => {
+        // Extraer enlace AceStream
+        const match = linea.match(/acestream:\?content_id=([a-fA-F0-9]+)/);
         if (match && match[1]) {
           const enlaceAce = `acestream://${match[1]}`;
           
