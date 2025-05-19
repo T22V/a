@@ -2,97 +2,297 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Procesador de enlaces AceStream</title>
   <style>
-    .botones-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-      gap: 10px;
-      margin-top: 20px;
+    :root {
+      --primary-color: #2c3e50;
+      --secondary-color: #3498db;
+      --accent-color: #e74c3c;
+      --light-color: #ecf0f1;
+      --dark-color: #2c3e50;
+      --success-color: #27ae60;
+      --warning-color: #f39c12;
+      --border-radius: 8px;
+      --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      --transition: all 0.3s ease;
     }
-    .boton-canal {
-      padding: 10px;
-      background-color: #4CAF50;
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background-color: #f5f7fa;
+      margin: 0;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    h1 {
+      color: var(--primary-color);
+      text-align: center;
+      margin-bottom: 30px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid var(--secondary-color);
+    }
+    
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+    
+    .main-button {
+      background-color: var(--secondary-color);
       color: white;
       border: none;
-      border-radius: 5px;
+      padding: 12px 24px;
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      transition: var(--transition);
+      box-shadow: var(--box-shadow);
+    }
+    
+    .main-button:hover {
+      background-color: #2980b9;
+      transform: translateY(-2px);
+    }
+    
+    .status-container {
+      background-color: white;
+      padding: 15px;
+      border-radius: var(--border-radius);
+      box-shadow: var(--box-shadow);
+      margin-bottom: 20px;
+    }
+    
+    .cargando {
+      color: var(--warning-color);
+      font-style: italic;
+    }
+    
+    .error {
+      color: var(--accent-color);
+      font-weight: bold;
+    }
+    
+    .success {
+      color: var(--success-color);
+    }
+    
+    .botones-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 15px;
+      margin-top: 20px;
+    }
+    
+    .canal-card {
+      background-color: white;
+      border-radius: var(--border-radius);
+      overflow: hidden;
+      box-shadow: var(--box-shadow);
+      transition: var(--transition);
+    }
+    
+    .canal-card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .boton-canal {
+      width: 100%;
+      padding: 12px;
+      background-color: var(--primary-color);
+      color: white;
+      border: none;
       cursor: pointer;
       text-align: center;
-      transition: background-color 0.3s;
+      font-weight: bold;
+      transition: var(--transition);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
+    
     .boton-canal:hover {
-      background-color: #45a049;
+      background-color: #1a252f;
     }
-    .cargando {
-      font-style: italic;
-      color: #666;
+    
+    .info-canal {
+      padding: 10px;
+      font-size: 0.85em;
+      color: #555;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: #f8f9fa;
     }
-    .error {
-      color: red;
+    
+    .calidad {
+      font-weight: bold;
+      color: var(--secondary-color);
+      padding: 3px 8px;
+      border-radius: 12px;
+      background-color: #e3f2fd;
+    }
+    
+    .multiaudio {
+      color: var(--success-color);
+      font-weight: bold;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    
+    .footer {
+      text-align: center;
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #ddd;
+      color: #7f8c8d;
+      font-size: 0.9em;
+    }
+    
+    @media (max-width: 768px) {
+      .botones-container {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      }
+      
+      .header {
+        flex-direction: column;
+        align-items: stretch;
+      }
     }
   </style>
 </head>
 <body>
-  <h1>Procesador de enlaces AceStream</h1>
-  <button onclick="obtenerYProcesarEnlaces()">Obtener Canales</button>
+  <div class="header">
+    <h1>📺 Procesador de enlaces AceStream</h1>
+    <button class="main-button" onclick="obtenerYProcesarEnlaces()">
+      <span id="button-text">Cargar Todos los Canales</span>
+      <span id="button-icon">🔍</span>
+    </button>
+  </div>
   
-  <div id="status" class="cargando"></div>
+  <div class="status-container">
+    <div id="status" class="cargando">Esperando acción...</div>
+  </div>
   
   <div id="botones-container" class="botones-container"></div>
+  
+  <div class="footer">
+    © 2023 AceStream Player | Todos los canales son proporcionados por terceros
+  </div>
 
   <script>
     async function obtenerYProcesarEnlaces() {
-      const rawGistUrl = "https://gist.githubusercontent.com/T22V/80b0b2d2e20ed0a455b66303b468e90b/raw";
+      const enlacesGistUrl = "https://gist.githubusercontent.com/T22V/80b0b2d2e20ed0a455b66303b468e90b/raw";
+      const infoGistUrl = "https://gist.githubusercontent.com/T22V/ab76c1aa6c6b90fb2a9ad38dc4a66210/raw";
       const statusElement = document.getElementById("status");
       const botonesContainer = document.getElementById("botones-container");
+      const buttonText = document.getElementById("button-text");
+      const buttonIcon = document.getElementById("button-icon");
       
       try {
-        statusElement.textContent = "Cargando canales desde GitHub Gist...";
+        buttonText.textContent = "Cargando...";
+        buttonIcon.textContent = "⏳";
+        statusElement.textContent = "Cargando canales...";
         statusElement.className = "cargando";
         botonesContainer.innerHTML = "";
         
-        const response = await fetch(rawGistUrl);
-        if (!response.ok) throw new Error("Error al obtener los enlaces");
+        const [enlacesResponse, infoResponse] = await Promise.all([
+          fetch(enlacesGistUrl),
+          fetch(infoGistUrl)
+        ]);
         
-        const gistContent = await response.text();
-        mostrarBotones(gistContent);
+        if (!enlacesResponse.ok) throw new Error("Error al obtener los enlaces");
+        if (!infoResponse.ok) throw new Error("Error al obtener la info de canales");
         
-        statusElement.textContent = `Canales cargados correctamente`;
-        statusElement.className = "";
+        const [enlacesContent, infoContent] = await Promise.all([
+          enlacesResponse.text(),
+          infoResponse.text()
+        ]);
+        
+        mostrarBotonesConInfo(enlacesContent, infoContent);
+        const count = document.querySelectorAll('.boton-canal').length;
+        statusElement.textContent = `✅ ${count} canales cargados correctamente`;
+        statusElement.className = "success";
+        buttonText.textContent = `Canales cargados (${count})`;
+        buttonIcon.textContent = "✅";
       } catch (error) {
-        statusElement.textContent = `Error: ${error.message}`;
+        statusElement.textContent = `❌ Error: ${error.message}`;
         statusElement.className = "error";
+        buttonText.textContent = "Reintentar";
+        buttonIcon.textContent = "🔄";
+        console.error(error);
       }
     }
 
-    function mostrarBotones(input) {
-      const lineas = input.split(/\n+/).filter(linea => linea.trim() !== "");
+    function mostrarBotonesConInfo(enlaces, infoCanales) {
       const botonesContainer = document.getElementById("botones-container");
-      let contador = 1;
-
-      lineas.forEach(linea => {
-        // Extraer enlace AceStream
-        const match = linea.match(/acestream:\?content_id=([a-fA-F0-9]+)/);
-        if (match && match[1]) {
-          const enlaceAce = `acestream://${match[1]}`;
-          
-          const boton = document.createElement("button");
-          boton.className = "boton-canal";
-          boton.textContent = `Canal ${contador}`;
-          boton.title = enlaceAce;
-          
-          boton.addEventListener("click", function() {
-            window.location.href = enlaceAce;
-          });
-          
-          botonesContainer.appendChild(boton);
-          contador++;
+      const infoMap = {};
+      
+      // Procesar información de canales
+      infoCanales.split('\n').forEach(linea => {
+        const [num, nombre, calidad, multiaudio] = linea.split(',').map(item => item.trim());
+        if (num && nombre) {
+          infoMap[num] = {
+            nombre,
+            calidad: calidad === '1080' ? '1080p' : '720p',
+            multiaudio: multiaudio === 'Sí'
+          };
         }
       });
 
-      if (contador === 1) {
-        botonesContainer.innerHTML = "<p>No se encontraron enlaces AceStream válidos</p>";
-      }
+      // Crear botones con info
+      enlaces.split(/\n+/)
+        .filter(linea => linea.trim() !== "")
+        .forEach((linea, index) => {
+          const numCanal = (index + 1).toString();
+          const info = infoMap[numCanal] || {
+            nombre: `Canal ${numCanal}`,
+            calidad: '720p',
+            multiaudio: false
+          };
+
+          const match = linea.match(/acestream:\?content_id=([a-fA-F0-9]+)/);
+          if (match && match[1]) {
+            const card = document.createElement("div");
+            card.className = "canal-card";
+            
+            const boton = document.createElement("button");
+            boton.className = "boton-canal";
+            boton.textContent = info.nombre;
+            boton.onclick = () => window.location.href = `acestream://${match[1]}`;
+            
+            const infoElement = document.createElement("div");
+            infoElement.className = "info-canal";
+            
+            const calidadElement = document.createElement("span");
+            calidadElement.className = "calidad";
+            calidadElement.textContent = info.calidad;
+            
+            infoElement.appendChild(calidadElement);
+            
+            if (info.multiaudio) {
+              const audioElement = document.createElement("span");
+              audioElement.className = "multiaudio";
+              audioElement.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg> Multiaudio';
+              infoElement.appendChild(audioElement);
+            }
+            
+            card.appendChild(boton);
+            card.appendChild(infoElement);
+            botonesContainer.appendChild(card);
+          }
+        });
     }
   </script>
 </body>
