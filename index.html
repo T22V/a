@@ -38,30 +38,29 @@
     }
     
     .header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
       margin-bottom: 20px;
-      flex-wrap: wrap;
-      gap: 15px;
     }
     
-    .main-button {
-      background-color: var(--secondary-color);
-      color: white;
-      border: none;
-      padding: 12px 24px;
+    .search-container {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+    }
+    
+    .search-input {
+      flex: 1;
+      padding: 12px 15px;
+      border: 1px solid #ddd;
       border-radius: var(--border-radius);
-      cursor: pointer;
       font-size: 16px;
-      font-weight: bold;
-      transition: var(--transition);
       box-shadow: var(--box-shadow);
+      transition: var(--transition);
     }
     
-    .main-button:hover {
-      background-color: #2980b9;
-      transform: translateY(-2px);
+    .search-input:focus {
+      outline: none;
+      border-color: var(--secondary-color);
+      box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
     }
     
     .status-container {
@@ -151,6 +150,14 @@
       gap: 5px;
     }
     
+    .no-results {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 20px;
+      color: var(--accent-color);
+      font-weight: bold;
+    }
+    
     .footer {
       text-align: center;
       margin-top: 40px;
@@ -164,25 +171,20 @@
       .botones-container {
         grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
       }
-      
-      .header {
-        flex-direction: column;
-        align-items: stretch;
-      }
     }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>📺 Procesador de enlaces AceStream</h1>
-    <button class="main-button" onclick="obtenerYProcesarEnlaces()">
-      <span id="button-text">Cargar Todos los Canales</span>
-      <span id="button-icon">🔍</span>
-    </button>
+  </div>
+  
+  <div class="search-container">
+    <input type="text" id="search-input" class="search-input" placeholder="Buscar canal por nombre..." autofocus>
   </div>
   
   <div class="status-container">
-    <div id="status" class="cargando">Esperando acción...</div>
+    <div id="status" class="cargando">Cargando canales...</div>
   </div>
   
   <div id="botones-container" class="botones-container"></div>
@@ -192,17 +194,50 @@
   </div>
 
   <script>
+    let allChannels = [];
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      obtenerYProcesarEnlaces();
+      
+      // Configurar el buscador
+      const searchInput = document.getElementById('search-input');
+      searchInput.addEventListener('input', function() {
+        filterChannels(this.value.toLowerCase());
+      });
+    });
+
+    function filterChannels(searchTerm) {
+      const botonesContainer = document.getElementById("botones-container");
+      botonesContainer.innerHTML = "";
+      
+      if (searchTerm === "") {
+        // Mostrar todos los canales si no hay término de búsqueda
+        allChannels.forEach(card => botonesContainer.appendChild(card.cloneNode(true)));
+        return;
+      }
+      
+      const filteredChannels = allChannels.filter(card => {
+        const channelName = card.querySelector('.boton-canal').textContent.toLowerCase();
+        return channelName.includes(searchTerm);
+      });
+      
+      if (filteredChannels.length === 0) {
+        const noResults = document.createElement("div");
+        noResults.className = "no-results";
+        noResults.textContent = "No se encontraron canales con ese nombre";
+        botonesContainer.appendChild(noResults);
+      } else {
+        filteredChannels.forEach(card => botonesContainer.appendChild(card.cloneNode(true)));
+      }
+    }
+
     async function obtenerYProcesarEnlaces() {
       const enlacesGistUrl = "https://gist.githubusercontent.com/T22V/80b0b2d2e20ed0a455b66303b468e90b/raw";
       const infoGistUrl = "https://gist.githubusercontent.com/T22V/ab76c1aa6c6b90fb2a9ad38dc4a66210/raw";
       const statusElement = document.getElementById("status");
       const botonesContainer = document.getElementById("botones-container");
-      const buttonText = document.getElementById("button-text");
-      const buttonIcon = document.getElementById("button-icon");
       
       try {
-        buttonText.textContent = "Cargando...";
-        buttonIcon.textContent = "⏳";
         statusElement.textContent = "Cargando canales...";
         statusElement.className = "cargando";
         botonesContainer.innerHTML = "";
@@ -221,16 +256,12 @@
         ]);
         
         mostrarBotonesConInfo(enlacesContent, infoContent);
-        const count = document.querySelectorAll('.boton-canal').length;
+        const count = document.querySelectorAll('.canal-card').length;
         statusElement.textContent = `✅ ${count} canales cargados correctamente`;
         statusElement.className = "success";
-        buttonText.textContent = `Canales cargados (${count})`;
-        buttonIcon.textContent = "✅";
       } catch (error) {
         statusElement.textContent = `❌ Error: ${error.message}`;
         statusElement.className = "error";
-        buttonText.textContent = "Reintentar";
-        buttonIcon.textContent = "🔄";
         console.error(error);
       }
     }
@@ -244,7 +275,7 @@
         const [num, nombre, calidad, multiaudio] = linea.split(',').map(item => item.trim());
         if (num && nombre) {
           infoMap[num] = {
-            nombre,
+            nombre: `${num}. ${nombre}`,
             calidad: calidad === '1080' ? '1080p' : '720p',
             multiaudio: multiaudio === 'Sí'
           };
@@ -257,7 +288,7 @@
         .forEach((linea, index) => {
           const numCanal = (index + 1).toString();
           const info = infoMap[numCanal] || {
-            nombre: `Canal ${numCanal}`,
+            nombre: `${numCanal}. Canal ${numCanal}`,
             calidad: '720p',
             multiaudio: false
           };
@@ -291,6 +322,9 @@
             card.appendChild(boton);
             card.appendChild(infoElement);
             botonesContainer.appendChild(card);
+            
+            // Guardar referencia a la tarjeta para el buscador
+            allChannels.push(card.cloneNode(true));
           }
         });
     }
