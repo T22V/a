@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Procesador de enlaces AceStream</title>
+  <style>
+    .botones-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .boton-canal {
+      padding: 10px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      text-align: center;
+      transition: background-color 0.3s;
+    }
+    .boton-canal:hover {
+      background-color: #45a049;
+    }
+    .cargando {
+      font-style: italic;
+      color: #666;
+    }
+    .error {
+      color: red;
+    }
+  </style>
+</head>
+<body>
+  <h1>Procesador de enlaces AceStream</h1>
+  <button onclick="obtenerYProcesarEnlaces()">Obtener Canales</button>
+  
+  <div id="status" class="cargando"></div>
+  
+  <div id="botones-container" class="botones-container"></div>
+
+  <script>
+    async function obtenerYProcesarEnlaces() {
+      const rawGistUrl = "https://gist.githubusercontent.com/2TV2/d8a2aa38e4a04c3ecdf51594ca9cf138/raw";
+      const statusElement = document.getElementById("status");
+      const botonesContainer = document.getElementById("botones-container");
+      
+      try {
+        statusElement.textContent = "Cargando canales desde GitHub Gist...";
+        statusElement.className = "cargando";
+        botonesContainer.innerHTML = "";
+        
+        const response = await fetch(rawGistUrl);
+        if (!response.ok) throw new Error("Error al obtener los enlaces");
+        
+        const gistContent = await response.text();
+        mostrarBotones(gistContent);
+        
+        statusElement.textContent = `Canales cargados correctamente`;
+        statusElement.className = "";
+      } catch (error) {
+        statusElement.textContent = `Error: ${error.message}`;
+        statusElement.className = "error";
+      }
+    }
+
+    function mostrarBotones(input) {
+      const enlaces = input.split(/\n+/).filter(linea => linea.trim() !== "");
+      const botonesContainer = document.getElementById("botones-container");
+      let contador = 1;
+
+      enlaces.forEach(enlace => {
+        const match = enlace.match(/acestream:\?content_id=([a-fA-F0-9]+)/);
+        if (match && match[1]) {
+          const enlaceAce = `acestream://${match[1]}`;
+          
+          const boton = document.createElement("button");
+          boton.className = "boton-canal";
+          boton.textContent = `Canal ${contador}`;
+          boton.title = enlaceAce;
+          
+          boton.addEventListener("click", function() {
+            window.location.href = enlaceAce;
+          });
+          
+          botonesContainer.appendChild(boton);
+          contador++;
+        }
+      });
+
+      if (contador === 1) {
+        botonesContainer.innerHTML = "<p>No se encontraron enlaces AceStream válidos</p>";
+      }
+    }
+  </script>
+</body>
+</html>
