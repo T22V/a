@@ -391,7 +391,7 @@
                 const [num, nombre, calidad, multiaudio] = linea.split(',').map(item => item.trim());
                 if (num && nombre) {
                     infoMap[num] = {
-                        nombre: `${num}. ${nombre}`,
+                        nombre: nombre,  // Solo el nombre sin el número prefijado
                         calidad: calidad === '1080' ? '1080p' : '720p',
                         multiaudio: multiaudio === 'Sí'
                     };
@@ -407,7 +407,7 @@
                 .forEach((linea, index) => {
                     const numCanal = (index + 1).toString();
                     const info = infoMap[numCanal] || {
-                        nombre: `${numCanal}. Canal ${numCanal}`,
+                        nombre: `Canal ${numCanal}`,  // Nombre sin número prefijado
                         calidad: '720p',
                         multiaudio: false
                     };
