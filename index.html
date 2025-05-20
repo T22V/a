@@ -87,7 +87,7 @@
     
     .botones-container {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
       gap: 15px;
       margin-top: 20px;
     }
@@ -98,6 +98,7 @@
       overflow: hidden;
       box-shadow: var(--box-shadow);
       transition: var(--transition);
+      border: 1px solid #e0e0e0;
     }
     
     .canal-card:hover {
@@ -107,17 +108,17 @@
     
     .boton-canal {
       width: 100%;
-      padding: 12px;
+      padding: 15px;
       background-color: var(--primary-color);
       color: white;
       border: none;
       cursor: pointer;
-      text-align: center;
+      text-align: left;
       font-weight: bold;
       transition: var(--transition);
-      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      font-size: 0.95em;
     }
     
     .boton-canal:hover {
@@ -125,21 +126,23 @@
     }
     
     .info-canal {
-      padding: 10px;
-      font-size: 0.85em;
-      color: #555;
+      padding: 12px 15px;
+      font-size: 0.9em;
+      color: #444;
       display: flex;
       justify-content: space-between;
       align-items: center;
       background-color: #f8f9fa;
+      border-top: 1px solid #e0e0e0;
     }
     
     .calidad {
       font-weight: bold;
       color: var(--secondary-color);
-      padding: 3px 8px;
+      padding: 4px 10px;
       border-radius: 12px;
       background-color: #e3f2fd;
+      font-size: 0.85em;
     }
     
     .multiaudio {
@@ -148,14 +151,18 @@
       display: flex;
       align-items: center;
       gap: 5px;
+      font-size: 0.85em;
     }
     
     .no-results {
       grid-column: 1 / -1;
       text-align: center;
-      padding: 20px;
+      padding: 30px;
       color: var(--accent-color);
       font-weight: bold;
+      background-color: white;
+      border-radius: var(--border-radius);
+      box-shadow: var(--box-shadow);
     }
     
     .footer {
@@ -169,7 +176,16 @@
     
     @media (max-width: 768px) {
       .botones-container {
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      }
+      
+      .boton-canal {
+        padding: 12px;
+        font-size: 0.9em;
+      }
+      
+      .info-canal {
+        padding: 10px 12px;
       }
     }
   </style>
