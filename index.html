@@ -26,6 +26,10 @@
             --radius-lg: 14px;
             --gradient-primary: linear-gradient(135deg, var(--primary), var(--primary-dark));
             --gradient-hover: linear-gradient(135deg, var(--primary-dark), var(--primary));
+            --movistar-blue: #00b2e3;
+            --eurosport-blue: #003366;
+            --dazn-black: #000000;
+            --f1-red: #e10600;
         }
 
         body.dark-mode {
@@ -35,6 +39,7 @@
             --text-light: #94a3b8;
             --border-color: #334155;
             --gradient-primary: linear-gradient(135deg, var(--primary-dark), #1a1a2e);
+            --dazn-black: #e2e8f0;
         }
 
         * {
@@ -243,6 +248,41 @@
             transform: scale(1.1);
         }
 
+        .channel-card.unknown {
+            opacity: 0.8;
+            filter: grayscale(0.5);
+        }
+
+        .channel-card.unknown .channel-header {
+            background: linear-gradient(135deg, #6b7280, #4b5563);
+        }
+
+        .channel-card.unknown .channel-name,
+        .channel-card.unknown .channel-number {
+            color: #e5e7eb;
+        }
+
+        .channel-card.unknown .channel-quality {
+            color: #9ca3af;
+            background-color: rgba(156, 163, 175, 0.1);
+        }
+
+        .movistar {
+            color: var(--movistar-blue) !important;
+        }
+
+        .eurosport {
+            color: var(--eurosport-blue) !important;
+        }
+
+        .dazn {
+            color: var(--dazn-black) !important;
+        }
+
+        .f1 {
+            color: var(--f1-red) !important;
+        }
+
         @media (max-width: 768px) {
             .channels-grid {
                 grid-template-columns: 1fr;
@@ -373,7 +413,8 @@
                     infoMap[num] = {
                         nombre: nombre,
                         calidad: calidad === '1080' ? '1080p' : '720p',
-                        multiaudio: multiaudio === 'Sí'
+                        multiaudio: multiaudio === 'Sí',
+                        isKnown: true
                     };
                 }
             });
@@ -387,7 +428,8 @@
                     const info = infoMap[numCanal] || {
                         nombre: `Canal ${numCanal}`,
                         calidad: '720p',
-                        multiaudio: false
+                        multiaudio: false,
+                        isKnown: false
                     };
 
                     const match = linea.match(/acestream:\?content_id=([a-fA-F0-9]+)/);
@@ -397,12 +439,31 @@
                             number: numCanal,
                             name: info.nombre,
                             quality: info.calidad,
-                            multiAudio: info.multiaudio
+                            multiAudio: info.multiaudio,
+                            isKnown: info.isKnown
                         });
                     }
                 });
             
             renderChannels(channelsData);
+        }
+
+        function highlightBrands(text) {
+            const brands = [
+                { name: 'Movistar', class: 'movistar' },
+                { name: 'Eurosport', class: 'eurosport' },
+                { name: 'DAZN', class: 'dazn' },
+                { name: 'F1', class: 'f1' }
+            ];
+
+            let result = text;
+            
+            brands.forEach(brand => {
+                const regex = new RegExp(`(${brand.name})`, 'gi');
+                result = result.replace(regex, `<span class="${brand.class}">$1</span>`);
+            });
+            
+            return result;
         }
 
         function renderChannels(channels) {
@@ -411,7 +472,7 @@
             
             channels.forEach(channel => {
                 const card = document.createElement("div");
-                card.className = "channel-card";
+                card.className = `channel-card ${channel.isKnown ? '' : 'unknown'}`;
                 card.onclick = () => window.location.href = `acestream://${channel.id}`;
                 
                 const header = document.createElement("div");
@@ -423,7 +484,7 @@
                 
                 const name = document.createElement("div");
                 name.className = "channel-name";
-                name.textContent = channel.name;
+                name.innerHTML = highlightBrands(channel.name);
                 
                 const infoElement = document.createElement("div");
                 infoElement.className = "channel-info";
