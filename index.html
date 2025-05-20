@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📺 AceStream Player</title>
+    <title>📺A4V📺</title>
     <style>
         :root {
             --primary: #4361ee;
@@ -15,8 +15,8 @@
             --bg-dark: #0f172a;
             --bg-light: #f5f7ff;
             --card-bg: #ffffff;
-            --text-dark: #212529;
-            --text-light: #6c757d;
+            --text-dark: #6798da;
+            --text-light: #6798da;
             --border-color: #e9ecef;
             --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
             --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
@@ -28,18 +28,20 @@
             --gradient-hover: linear-gradient(135deg, var(--primary-dark), var(--primary));
             --movistar-blue: #94fcff;
             --eurosport-blue: #5f39d8;
-            --dazn-black: #999999;
-            --f1-red: #1e1c24;
+            --dazn-black: #000000;
+            --f1-red:#ff3535;
+            --channel-name-color: #e5e7eb; /* Nuevo: gris claro para nombres de canal */
         }
 
         body.dark-mode {
             --bg-light: #0f172a;
             --card-bg: #1e293b;
             --text-dark: #f8fafc;
-            --text-light: #94a3b8;
-            --border-color: #334155;
+            --text-light: #6798da;
+            --border-color: #6798da;
             --gradient-primary: linear-gradient(135deg, var(--primary-dark), #1a1a2e);
             --dazn-black: #e2e8f0;
+            --channel-name-color: #d1d5db; /* Gris más claro para modo oscuro */
         }
 
         * {
@@ -168,7 +170,7 @@
 
         .channel-name {
             font-weight: 600;
-            color: white;
+            color: var(--channel-name-color); /* Cambiado a la nueva variable */
             font-size: 0.95rem;
             position: absolute;
             left: 50%;
@@ -257,7 +259,10 @@
             background: linear-gradient(135deg, #6b7280, #4b5563);
         }
 
-        .channel-card.unknown .channel-name,
+        .channel-card.unknown .channel-name {
+            color: var(--channel-name-color); /* Cambiado a la nueva variable */
+        }
+
         .channel-card.unknown .channel-number {
             color: #e5e7eb;
         }
@@ -304,7 +309,7 @@
 </head>
 <body>
     <header class="header">
-        <div class="header__title">📺 AceStream Player</div>
+        <div class="header__title"></div>
         <div class="header__actions">
             <button class="dark-mode-toggle" id="darkModeToggle">🌓</button>
         </div>
