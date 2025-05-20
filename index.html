@@ -280,7 +280,7 @@
         }
 
         .dazn {
-            color: #000000 !important; /* Cambiado a negro fijo */
+            color: #000000 !important;
         }
 
         .f1 {
@@ -474,7 +474,23 @@
             const botonesContainer = document.getElementById("channelsGrid");
             botonesContainer.innerHTML = "";
             
-            channels.forEach(channel => {
+            // Ordenar los canales: primero por si es OFF (los OFF van al final), luego por nombre, luego por número
+            const sortedChannels = [...channels].sort((a, b) => {
+                // Si un canal es OFF y el otro no, el OFF va después
+                const aIsOff = a.name.includes('OFF');
+                const bIsOff = b.name.includes('OFF');
+                
+                if (aIsOff && !bIsOff) return 1;
+                if (!aIsOff && bIsOff) return -1;
+                
+                // Si ambos son OFF o ninguno es OFF, ordenar por nombre y luego por número
+                const nameComparison = a.name.localeCompare(b.name);
+                if (nameComparison !== 0) return nameComparison;
+                
+                return parseInt(a.number) - parseInt(b.number);
+            });
+            
+            sortedChannels.forEach(channel => {
                 const card = document.createElement("div");
                 card.className = `channel-card ${channel.isKnown ? '' : 'unknown'}`;
                 card.onclick = () => window.location.href = `acestream://${channel.id}`;
