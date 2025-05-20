@@ -77,23 +77,6 @@
             gap: 10px;
         }
 
-        .status-badge {
-            padding: 0.3rem 0.6rem;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            background-color: var(--success);
-            color: white;
-        }
-
-        .status-badge--warning {
-            background-color: var(--warning);
-        }
-
-        .status-badge--danger {
-            background-color: var(--secondary);
-        }
-
         .main-container {
             max-width: 1400px;
             margin: 0 auto;
@@ -166,6 +149,7 @@
             padding: 1rem;
             background: var(--gradient-primary);
             color: white;
+            position: relative;
         }
 
         .channel-number {
@@ -181,8 +165,11 @@
             font-weight: 600;
             color: white;
             font-size: 0.95rem;
-            flex-grow: 1;
-            margin: 0 0.5rem;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            width: calc(100% - 80px);
+            text-align: center;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -268,6 +255,10 @@
             .header__title {
                 font-size: 1rem;
             }
+
+            .channel-name {
+                width: calc(100% - 70px);
+            }
         }
     </style>
 </head>
@@ -275,7 +266,6 @@
     <header class="header">
         <div class="header__title">📺 AceStream Player</div>
         <div class="header__actions">
-            <span class="status-badge" id="statusBadge">Cargando...</span>
             <button class="dark-mode-toggle" id="darkModeToggle">🌓</button>
         </div>
     </header>
@@ -297,6 +287,7 @@
 
     <script>
         let allChannels = [];
+        let channelsData = [];
         
         document.addEventListener('DOMContentLoaded', function() {
             // Estado para el modo oscuro
@@ -327,13 +318,12 @@
             botonesContainer.innerHTML = "";
             
             if (searchTerm === "") {
-                // Mostrar todos los canales si no hay término de búsqueda
-                allChannels.forEach(card => botonesContainer.appendChild(card.cloneNode(true)));
+                renderChannels(channelsData);
                 return;
             }
             
-            const filteredChannels = allChannels.filter(card => {
-                const channelName = card.querySelector('.channel-name').textContent.toLowerCase();
+            const filteredChannels = channelsData.filter(channel => {
+                const channelName = channel.name.toLowerCase();
                 return channelName.includes(searchTerm);
             });
             
@@ -343,19 +333,16 @@
                 noResults.textContent = "No se encontraron canales con ese nombre";
                 botonesContainer.appendChild(noResults);
             } else {
-                filteredChannels.forEach(card => botonesContainer.appendChild(card.cloneNode(true)));
+                renderChannels(filteredChannels);
             }
         }
 
         async function obtenerYProcesarEnlaces() {
             const enlacesGistUrl = "https://gist.githubusercontent.com/T22V/80b0b2d2e20ed0a455b66303b468e90b/raw";
             const infoGistUrl = "https://gist.githubusercontent.com/T22V/ab76c1aa6c6b90fb2a9ad38dc4a66210/raw";
-            const statusElement = document.getElementById("statusBadge");
             const botonesContainer = document.getElementById("channelsGrid");
             
             try {
-                statusElement.textContent = "Cargando canales...";
-                statusElement.className = "status-badge status-badge--warning";
                 botonesContainer.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
                 
                 const [enlacesResponse, infoResponse] = await Promise.all([
@@ -371,90 +358,95 @@
                     infoResponse.text()
                 ]);
                 
-                mostrarBotonesConInfo(enlacesContent, infoContent);
-                const count = document.querySelectorAll('.channel-card').length;
-                statusElement.textContent = `✅ ${count} canales cargados`;
-                statusElement.className = "status-badge";
+                processChannelsData(enlacesContent, infoContent);
             } catch (error) {
-                statusElement.textContent = `❌ ${error.message}`;
-                statusElement.className = "status-badge status-badge--danger";
                 console.error(error);
             }
         }
 
-        function mostrarBotonesConInfo(enlaces, infoCanales) {
-            const botonesContainer = document.getElementById("channelsGrid");
+        function processChannelsData(enlaces, infoCanales) {
             const infoMap = {};
             
-            // Procesar información de canales
             infoCanales.split('\n').forEach(linea => {
                 const [num, nombre, calidad, multiaudio] = linea.split(',').map(item => item.trim());
                 if (num && nombre) {
                     infoMap[num] = {
-                        nombre: nombre,  // Solo el nombre sin el número prefijado
+                        nombre: nombre,
                         calidad: calidad === '1080' ? '1080p' : '720p',
                         multiaudio: multiaudio === 'Sí'
                     };
                 }
             });
 
-            // Crear botones con info
-            botonesContainer.innerHTML = "";
-            allChannels = [];
+            channelsData = [];
             
             enlaces.split(/\n+/)
                 .filter(linea => linea.trim() !== "")
                 .forEach((linea, index) => {
                     const numCanal = (index + 1).toString();
                     const info = infoMap[numCanal] || {
-                        nombre: `Canal ${numCanal}`,  // Nombre sin número prefijado
+                        nombre: `Canal ${numCanal}`,
                         calidad: '720p',
                         multiaudio: false
                     };
 
                     const match = linea.match(/acestream:\?content_id=([a-fA-F0-9]+)/);
                     if (match && match[1]) {
-                        const card = document.createElement("div");
-                        card.className = "channel-card";
-                        card.onclick = () => window.location.href = `acestream://${match[1]}`;
-                        
-                        const header = document.createElement("div");
-                        header.className = "channel-header";
-                        
-                        const number = document.createElement("div");
-                        number.className = "channel-number";
-                        number.textContent = numCanal;
-                        
-                        const name = document.createElement("div");
-                        name.className = "channel-name";
-                        name.textContent = info.nombre;
-                        
-                        const infoElement = document.createElement("div");
-                        infoElement.className = "channel-info";
-                        
-                        const calidadElement = document.createElement("span");
-                        calidadElement.className = "channel-quality";
-                        calidadElement.textContent = info.calidad;
-                        
-                        infoElement.appendChild(calidadElement);
-                        
-                        if (info.multiaudio) {
-                            const audioElement = document.createElement("span");
-                            audioElement.className = "channel-audio";
-                            audioElement.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg> Multiaudio';
-                            infoElement.appendChild(audioElement);
-                        }
-                        
-                        header.appendChild(number);
-                        header.appendChild(name);
-                        card.appendChild(header);
-                        card.appendChild(infoElement);
-                        botonesContainer.appendChild(card);
-                        
-                        // Guardar referencia a la tarjeta para el buscador
-                        allChannels.push(card.cloneNode(true));
+                        channelsData.push({
+                            id: match[1],
+                            number: numCanal,
+                            name: info.nombre,
+                            quality: info.calidad,
+                            multiAudio: info.multiaudio
+                        });
                     }
                 });
+            
+            renderChannels(channelsData);
+        }
+
+        function renderChannels(channels) {
+            const botonesContainer = document.getElementById("channelsGrid");
+            botonesContainer.innerHTML = "";
+            
+            channels.forEach(channel => {
+                const card = document.createElement("div");
+                card.className = "channel-card";
+                card.onclick = () => window.location.href = `acestream://${channel.id}`;
+                
+                const header = document.createElement("div");
+                header.className = "channel-header";
+                
+                const number = document.createElement("div");
+                number.className = "channel-number";
+                number.textContent = channel.number;
+                
+                const name = document.createElement("div");
+                name.className = "channel-name";
+                name.textContent = channel.name;
+                
+                const infoElement = document.createElement("div");
+                infoElement.className = "channel-info";
+                
+                const calidadElement = document.createElement("span");
+                calidadElement.className = "channel-quality";
+                calidadElement.textContent = channel.quality;
+                
+                infoElement.appendChild(calidadElement);
+                
+                if (channel.multiAudio) {
+                    const audioElement = document.createElement("span");
+                    audioElement.className = "channel-audio";
+                    audioElement.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg> Multiaudio';
+                    infoElement.appendChild(audioElement);
+                }
+                
+                header.appendChild(number);
+                header.appendChild(name);
+                card.appendChild(header);
+                card.appendChild(infoElement);
+                botonesContainer.appendChild(card);
+            });
         }
     </script>
 </body>
