@@ -453,22 +453,23 @@
         }
 
         function highlightBrands(text) {
-            const brands = [
-                { name: 'Movistar+', class: 'movistar' },
-                { name: '★Eurosport', class: 'eurosport' },
-                { name: 'DAZN', class: 'dazn' },
-                { name: 'F1', class: 'f1' }
-            ];
+    const brands = [
+        { name: 'MOVISTAR+', class: 'movistar' },
+        { name: '★Eurosport', class: 'eurosport' },
+        { name: 'DAZN', class: 'dazn' },
+        { name: 'F1', class: 'f1' }
+    ];
 
-            let result = text;
-            
-            brands.forEach(brand => {
-                const regex = new RegExp(`(${brand.name})`, 'gi');
-                result = result.replace(regex, `<span class="${brand.class}">$1</span>`);
-            });
-            
-            return result;
-        }
+    let result = text;
+
+    brands.forEach(brand => {
+        const escapedName = brand.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const regex = new RegExp(`(${escapedName})`, 'gi');
+        result = result.replace(regex, `<span class="${brand.class}">$1</span>`);
+    });
+
+    return result;
+}
 
         function renderChannels(channels) {
             const botonesContainer = document.getElementById("channelsGrid");
