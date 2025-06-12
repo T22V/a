@@ -487,11 +487,18 @@
                     }
                 });
             
-            // Combinar todos los canales
-            channelsData = [...numberedChannels];
+            // Eliminar canales duplicados por ID de Acestream
+            const uniqueChannels = [];
+            const idMap = {};
             
-            // Ordenar por número de canal
-            channelsData.sort((a, b) => parseInt(a.number) - parseInt(b.number));
+            numberedChannels.forEach(channel => {
+                if (!idMap[channel.id]) {
+                    idMap[channel.id] = true;
+                    uniqueChannels.push(channel);
+                }
+            });
+            
+            channelsData = [...uniqueChannels];
             
             renderChannels(channelsData);
         }
@@ -519,7 +526,7 @@
             const botonesContainer = document.getElementById("channelsGrid");
             botonesContainer.innerHTML = "";
             
-            // Ordenar los canales: primero por si es OFF (los OFF van al final), luego por número
+            // Ordenar los canales: primero por si es OFF (los OFF van al final), luego por nombre
             const sortedChannels = [...channels].sort((a, b) => {
                 // Si un canal es OFF y el otro no, el OFF va después
                 const aIsOff = a.name.includes('OFF');
@@ -528,8 +535,8 @@
                 if (aIsOff && !bIsOff) return 1;
                 if (!aIsOff && bIsOff) return -1;
                 
-                // Si ambos son OFF o ninguno es OFF, ordenar por número
-                return parseInt(a.number) - parseInt(b.number);
+                // Si ambos son OFF o ninguno es OFF, ordenar por nombre
+                return a.name.localeCompare(b.name);
             });
             
             sortedChannels.forEach(channel => {
@@ -573,4 +580,4 @@
         }
     </script>
 </body>
-</html>l>
+</html>
