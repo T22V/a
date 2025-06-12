@@ -308,7 +308,7 @@
 </head>
 <body>
     <header class="header">
-        <div class="header__title"></div>
+        <div class="header__title">📺A4V📺</div>
         <div class="header__actions">
             <button class="dark-mode-toggle" id="darkModeToggle">🌓</button>
         </div>
@@ -405,77 +405,123 @@
                 processChannelsData(enlacesContent, infoContent);
             } catch (error) {
                 console.error(error);
+                botonesContainer.innerHTML = '<div class="no-results">Error al cargar los canales</div>';
             }
         }
 
         function processChannelsData(enlaces, infoCanales) {
             const infoMap = {};
+            const numberedChannels = [];
+            const additionalChannels = [];
             
+            // Procesar todas las líneas del archivo de info
             infoCanales.split('\n').forEach(linea => {
-                const [num, nombre, calidad, multiaudio] = linea.split(',').map(item => item.trim());
-                if (num && nombre) {
+                linea = linea.trim();
+                if (!linea) return;
+                
+                // Dividir la línea por comas
+                const parts = linea.split(',').map(part => part.trim());
+                
+                // El formato puede ser:
+                // 1) Para canales <500: num, nombre, calidad, multiaudio
+                // 2) Para canales >=500: num, nombre, calidad, multiaudio, acestream://id
+                if (parts.length >= 4) {
+                    const num = parts[0];
+                    const nombre = parts[1];
+                    const calidad = parts[2] === 'N/A' ? '720p' : (parts[2] === '1080' ? '1080p' : parts[2]);
+                    const multiaudio = parts[3] === 'Sí' || parts[3] === 'Sí,' || parts[3] === 'Yes';
+                    
                     infoMap[num] = {
                         nombre: nombre,
-                        calidad: calidad === '1080' ? '1080p' : '720p',
-                        multiaudio: multiaudio === 'Sí',
+                        calidad: calidad,
+                        multiaudio: multiaudio,
                         isKnown: true
                     };
+                    
+                    // Si es un canal >=500 y tiene enlace Acestream (parts[4])
+                    if (parseInt(num) >= 500 && parts.length >= 5 && parts[4]) {
+                        const acestreamId = parts[4].match(/acestream:\/\/([a-fA-F0-9]+)/)?.[1] || 
+                                           parts[4].match(/([a-fA-F0-9]{40})/)?.[1];
+                        
+                        if (acestreamId) {
+                            numberedChannels.push({
+                                id: acestreamId,
+                                number: num,
+                                name: nombre,
+                                quality: calidad,
+                                multiAudio: multiaudio,
+                                isKnown: true,
+                                source: 'numbered'
+                            });
+                        }
+                    }
                 }
             });
-
-            channelsData = [];
             
+            // Procesar enlaces numerados (para canales <500)
             enlaces.split(/\n+/)
                 .filter(linea => linea.trim() !== "")
                 .forEach((linea, index) => {
                     const numCanal = (index + 1).toString();
-                    const info = infoMap[numCanal] || {
-                        nombre: `Canal ${numCanal}`,
-                        calidad: '720p',
-                        multiaudio: false,
-                        isKnown: false
-                    };
+                    // Solo procesar si el número es menor a 500
+                    if (parseInt(numCanal) < 500) {
+                        const info = infoMap[numCanal] || {
+                            nombre: `Canal ${numCanal}`,
+                            calidad: '720p',
+                            multiaudio: false,
+                            isKnown: false
+                        };
 
-                    const match = linea.match(/acestream:\?content_id=([a-fA-F0-9]+)/);
-                    if (match && match[1]) {
-                        channelsData.push({
-                            id: match[1],
-                            number: numCanal,
-                            name: info.nombre,
-                            quality: info.calidad,
-                            multiAudio: info.multiaudio,
-                            isKnown: info.isKnown
-                        });
+                        const match = linea.match(/acestream:\?content_id=([a-fA-F0-9]+)/) || linea.match(/([a-fA-F0-9]{40})/);
+                        if (match && match[1]) {
+                            numberedChannels.push({
+                                id: match[1],
+                                number: numCanal,
+                                name: info.nombre,
+                                quality: info.calidad,
+                                multiAudio: info.multiaudio,
+                                isKnown: info.isKnown,
+                                source: 'numbered'
+                            });
+                        }
                     }
                 });
+            
+            // Combinar todos los canales
+            channelsData = [...numberedChannels];
+            
+            // Ordenar por número de canal
+            channelsData.sort((a, b) => parseInt(a.number) - parseInt(b.number));
             
             renderChannels(channelsData);
         }
 
         function highlightBrands(text) {
-    const brands = [
-        { name: 'MOVISTAR+', class: 'movistar' },
-        { name: '★Eurosport', class: 'eurosport' },
-        { name: 'DAZN', class: 'dazn' },
-        { name: 'F1', class: 'f1' }
-    ];
+            const brands = [
+                { name: 'MOVISTAR+', class: 'movistar' },
+                { name: '★Eurosport', class: 'eurosport' },
+                { name: 'DAZN', class: 'dazn' },
+                { name: 'F1', class: 'f1' },
+                { name: 'Movistar', class: 'movistar' },
+                { name: 'Eurosport', class: 'eurosport' }
+            ];
 
-    let result = text;
+            let result = text;
 
-    brands.forEach(brand => {
-        const escapedName = brand.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-        const regex = new RegExp(`(${escapedName})`, 'gi');
-        result = result.replace(regex, `<span class="${brand.class}">$1</span>`);
-    });
+            brands.forEach(brand => {
+                const escapedName = brand.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                const regex = new RegExp(`(${escapedName})`, 'gi');
+                result = result.replace(regex, `<span class="${brand.class}">$1</span>`);
+            });
 
-    return result;
-}
+            return result;
+        }
 
         function renderChannels(channels) {
             const botonesContainer = document.getElementById("channelsGrid");
             botonesContainer.innerHTML = "";
             
-            // Ordenar los canales: primero por si es OFF (los OFF van al final), luego por nombre, luego por número
+            // Ordenar los canales: primero por si es OFF (los OFF van al final), luego por número
             const sortedChannels = [...channels].sort((a, b) => {
                 // Si un canal es OFF y el otro no, el OFF va después
                 const aIsOff = a.name.includes('OFF');
@@ -484,10 +530,7 @@
                 if (aIsOff && !bIsOff) return 1;
                 if (!aIsOff && bIsOff) return -1;
                 
-                // Si ambos son OFF o ninguno es OFF, ordenar por nombre y luego por número
-                const nameComparison = a.name.localeCompare(b.name);
-                if (nameComparison !== 0) return nameComparison;
-                
+                // Si ambos son OFF o ninguno es OFF, ordenar por número
                 return parseInt(a.number) - parseInt(b.number);
             });
             
