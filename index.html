@@ -31,6 +31,16 @@
             --dazn-black: #000000;
             --f1-red:#ff3535;
             --channel-name-color: #888888;
+            --action-red: #ff544d;
+            --classics-red: #fa3732;
+            --sports-green: #11a45b;
+            --vamos-green: #1fc23d;
+            --copadelrey-green: #449653;
+            --champions-teal: #00dd96;
+            --liga-teal: #21ffb8;
+            --hypermotion-cyan: #04d2d7;
+            --golf-teal: #4ee1b0;
+            --eurosport-number-red: #ff3535;
         }
 
         body.dark-mode {
@@ -287,6 +297,46 @@
             color: var(--f1-red) !important;
         }
 
+        .action {
+            color: var(--action-red) !important;
+        }
+
+        .classics {
+            color: var(--classics-red) !important;
+        }
+
+        .sports {
+            color: var(--sports-green) !important;
+        }
+
+        .vamos {
+            color: var(--vamos-green) !important;
+        }
+
+        .copadelrey {
+            color: var(--copadelrey-green) !important;
+        }
+
+        .champions {
+            color: var(--champions-teal) !important;
+        }
+
+        .liga {
+            color: var(--liga-teal) !important;
+        }
+
+        .hypermotion {
+            color: var(--hypermotion-cyan) !important;
+        }
+
+        .golf {
+            color: var(--golf-teal) !important;
+        }
+
+        .eurosport-number {
+            color: var(--eurosport-number-red) !important;
+        }
+
         @media (max-width: 768px) {
             .channels-grid {
                 grid-template-columns: 1fr;
@@ -509,14 +559,31 @@
                 { name: '★Eurosport', class: 'eurosport' },
                 { name: 'DAZN', class: 'dazn' },
                 { name: 'F1', class: 'f1' },
+                { name: 'Accion', class: 'action' },
+                { name: 'hits', class: 'action' },
+                { name: 'clasicos', class: 'action' },
+                { name: 'Clásicos', class: 'classics' },
+                { name: 'Deportes', class: 'sports' },
+                { name: 'Vamos', class: 'vamos' },
+                { name: 'Copa del Rey', class: 'copadelrey' },
+                { name: 'Liga de Campeones', class: 'champions' },
+                { name: 'La Liga', class: 'liga' },
+                { name: 'Hypermotion', class: 'hypermotion' },
+                { name: 'Golf', class: 'golf' },
+                { name: '★Eurosport \\d+', class: 'eurosport-number', regex: true }
             ];
 
             let result = text;
 
             brands.forEach(brand => {
-                const escapedName = brand.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-                const regex = new RegExp(`(${escapedName})`, 'gi');
-                result = result.replace(regex, `<span class="${brand.class}">$1</span>`);
+                if (brand.regex) {
+                    const regex = new RegExp(`(${brand.name})`, 'gi');
+                    result = result.replace(regex, `<span class="${brand.class}">$1</span>`);
+                } else {
+                    const escapedName = brand.name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                    const regex = new RegExp(`(${escapedName})`, 'gi');
+                    result = result.replace(regex, `<span class="${brand.class}">$1</span>`);
+                }
             });
 
             return result;
