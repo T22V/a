@@ -13,21 +13,21 @@
             --warning: #f8961e;
             --info: #4895ef;
             --bg-dark: #0f172a;
-            --bg-light: #f5f7ff;
-            --card-bg: #ffffff;
-            --text-dark: #0000ff;
-            --text-light: #ff0000;
-            --border-color: #e9ecef;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
-            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
-            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+            --bg-light: #1e1a2e;
+            --card-bg: #2a2352;
+            --text-dark: #e2e2ff;
+            --text-light: #e2e2ff;
+            --border-color: #3a0ca3;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.3);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.3);
             --radius-sm: 6px;
             --radius-md: 10px;
             --radius-lg: 14px;
             --gradient-primary: linear-gradient(135deg, var(--primary), var(--primary-dark));
             --gradient-hover: linear-gradient(135deg, var(--primary-dark), var(--primary));
             --movistar-blue: #0085C1;
-            --eurosport-blue: #8866ff;
+            --eurosport-blue: #440c8b;
             --dazn-black: #000000;
             --f1-red:#ff3535;
             --channel-name-color: #888888;
@@ -44,18 +44,18 @@
             --gist-source-color: #4cc9f0;
             --elcano-source-color: #f72585;
             --special-gist-color: #9c27b0;
-            --smartbank-red: #a82705;
+            --smartbank-red: #f72585;
             --plus-black: #000000;
         }
 
-        body.dark-mode {
-            --bg-light: #0f172a;
-            --card-bg: #1e293b;
-            --text-dark: #999999;
-            --text-light: #999999;
-            --border-color: #6798da;
-            --gradient-primary: linear-gradient(135deg, var(--primary-dark), #1a1a2e);
-            --channel-name-color: #999999;
+        body.light-mode {
+            --bg-light: #f5f7ff;
+            --card-bg: #ffffff;
+            --text-dark: #3a0ca3;
+            --text-light: #3a0ca3;
+            --border-color: #e9ecef;
+            --gradient-primary: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            --channel-name-color: #4361ee;
         }
 
         * {
@@ -487,10 +487,10 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            const isDarkMode = localStorage.getItem('darkMode') === 'true';
-            if (isDarkMode) {
-                document.body.classList.add('dark-mode');
-                document.getElementById('darkModeToggle').textContent = '☀️';
+            const isDarkMode = localStorage.getItem('darkMode') !== 'false'; // Por defecto modo oscuro
+            if (!isDarkMode) {
+                document.body.classList.add('light-mode');
+                document.getElementById('darkModeToggle').textContent = '🌙';
             }
             
             loadInitialChannels();
@@ -501,9 +501,9 @@
             });
 
             document.getElementById('darkModeToggle').addEventListener('click', function() {
-                const isDark = document.body.classList.toggle('dark-mode');
-                localStorage.setItem('darkMode', isDark);
-                this.textContent = isDark ? '☀️' : '🌓';
+                const isLight = document.body.classList.toggle('light-mode');
+                localStorage.setItem('darkMode', !isLight);
+                this.textContent = isLight ? '🌙' : '☀️';
             });
         });
 
@@ -785,6 +785,8 @@
                         simplifiedName = simplifiedName.replace('LaLiga Smartbank', 'M+ La Liga Smartbank');
                     } else if (simplifiedName.includes('Eurosport')) {
                         simplifiedName = '★' + simplifiedName.replace('Eurosport', 'EUROSPORT');
+                    } else if (simplifiedName.includes('LaLiga')) {
+                        simplifiedName = simplifiedName.replace('LaLiga', 'M+ La Liga');
                     } else if (simplifiedName.includes('MovistarPlus')) {
                         simplifiedName = simplifiedName.replace('MovistarPlus', 'M+ Plus');
                     } else if (simplifiedName.includes('Vamos')) {
