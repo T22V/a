@@ -371,6 +371,17 @@
             cursor: pointer;
         }
 
+        .status-message {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 0.5rem;
+            color: var(--success);
+            font-size: 0.85rem;
+            background-color: rgba(76, 201, 240, 0.1);
+            border-radius: var(--radius-sm);
+            margin-bottom: 0.5rem;
+        }
+
         @media (max-width: 768px) {
             .channels-grid {
                 grid-template-columns: 1fr;
@@ -416,6 +427,8 @@
     <script>
         let allChannels = [];
         let channelsData = [];
+        let elcanoRetries = 0;
+        const MAX_ELCANO_RETRIES = 3;
         
         document.addEventListener('DOMContentLoaded', function() {
             // Estado para el modo oscuro
@@ -425,8 +438,8 @@
                 document.getElementById('darkModeToggle').textContent = '☀️';
             }
             
-            // Cargar datos de ambas fuentes
-            loadAllSources();
+            // Cargar primero los canales de Gist (rápidos)
+            loadGistChannels();
             
             // Configurar el buscador
             const searchInput = document.getElementById('searchInput');
@@ -442,39 +455,81 @@
             });
         });
 
-        async function loadAllSources() {
+        async function loadGistChannels() {
             const botonesContainer = document.getElementById("channelsGrid");
             botonesContainer.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
             
             try {
-                // Cargar ambas fuentes en paralelo
-                const [gistChannels, elcanoChannels] = await Promise.all([
-                    loadGistSource(),
-                    loadElcanoSource().catch(e => []) // Si falla, devolver array vacío
-                ]);
+                const gistChannels = await loadGistSource();
+                channelsData = gistChannels;
+                renderChannels(channelsData);
+                
+                // Mostrar mensaje de que se están cargando más canales
+                showStatusMessage("Cargando más canales en segundo plano...");
+                
+                // Ahora cargar ElCanó en segundo plano
+                loadElcanoChannels();
+            } catch (error) {
+                console.error("Error al cargar Gist:", error);
+                botonesContainer.innerHTML = `
+                    <div class="no-results">
+                        Error al cargar los canales principales<br>
+                        <button class="retry-button" onclick="loadGistChannels()">Reintentar</button>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadElcanoChannels() {
+            try {
+                const elcanoChannels = await loadElcanoSource();
                 
                 // Combinar los canales, eliminando duplicados por ID de Acestream
-                const combinedChannels = [...gistChannels, ...elcanoChannels];
                 const uniqueChannelsMap = new Map();
                 
-                combinedChannels.forEach(channel => {
-                    if (!uniqueChannelsMap.has(channel.id)) {
-                        uniqueChannelsMap.set(channel.id, channel);
-                    }
+                // Primero añadimos los canales existentes (de Gist)
+                channelsData.forEach(channel => {
+                    uniqueChannelsMap.set(channel.id, channel);
+                });
+                
+                // Luego añadimos los de ElCanó (sobrescriben si tienen el mismo ID)
+                elcanoChannels.forEach(channel => {
+                    uniqueChannelsMap.set(channel.id, channel);
                 });
                 
                 channelsData = Array.from(uniqueChannelsMap.values());
                 renderChannels(channelsData);
+                showStatusMessage("Todos los canales cargados correctamente");
+                elcanoRetries = 0; // Resetear contador de reintentos
                 
             } catch (error) {
-                console.error("Error al cargar fuentes:", error);
-                botonesContainer.innerHTML = `
-                    <div class="no-results">
-                        Error al cargar los canales<br>
-                        <button class="retry-button" onclick="loadAllSources()">Reintentar</button>
-                    </div>
-                `;
+                console.error("Error al cargar ElCanó:", error);
+                elcanoRetries++;
+                
+                if (elcanoRetries <= MAX_ELCANO_RETRIES) {
+                    console.log(`Reintentando ElCanó (${elcanoRetries}/${MAX_ELCANO_RETRIES})...`);
+                    showStatusMessage(`Intentando cargar más canales... (Intento ${elcanoRetries}/${MAX_ELCANO_RETRIES})`);
+                    setTimeout(loadElcanoChannels, 2000 * elcanoRetries); // Espera exponencial
+                } else {
+                    console.log("Máximo de reintentos alcanzado para ElCanó");
+                    showStatusMessage("No se pudieron cargar todos los canales adicionales", "error");
+                }
             }
+        }
+
+        function showStatusMessage(message, type = "info") {
+            let statusElement = document.querySelector(".status-message");
+            
+            if (!statusElement) {
+                statusElement = document.createElement("div");
+                statusElement.className = "status-message";
+                const channelsGrid = document.getElementById("channelsGrid");
+                channelsGrid.insertBefore(statusElement, channelsGrid.firstChild);
+            }
+            
+            statusElement.textContent = message;
+            statusElement.style.color = type === "error" ? "var(--secondary)" : "var(--success)";
+            statusElement.style.backgroundColor = type === "error" ? "rgba(247, 37, 133, 0.1)" : "rgba(76, 201, 240, 0.1)";
         }
 
         async function loadGistSource() {
@@ -731,7 +786,13 @@
 
         function renderChannels(channels) {
             const botonesContainer = document.getElementById("channelsGrid");
+            
+            // Mantener el mensaje de estado si existe
+            const statusMessage = document.querySelector(".status-message");
             botonesContainer.innerHTML = "";
+            if (statusMessage) {
+                botonesContainer.appendChild(statusMessage);
+            }
             
             // Ordenar los canales: primero por si es OFF (los OFF van al final), luego por nombre
             const sortedChannels = [...channels].sort((a, b) => {
