@@ -41,6 +41,8 @@
             --hypermotion-cyan: #04d2d7;
             --golf-teal: #4ee1b0;
             --eurosport-number-red: #ff3535;
+            --gist-source-color: #4cc9f0;
+            --elcano-source-color: #f72585;
         }
 
         body.dark-mode {
@@ -150,6 +152,7 @@
             transition: all 0.2s;
             cursor: pointer;
             box-shadow: var(--shadow-sm);
+            position: relative;
         }
 
         .channel-card:hover {
@@ -337,6 +340,37 @@
             color: var(--eurosport-number-red) !important;
         }
 
+        .source-badge {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 0.6rem;
+            font-weight: bold;
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            z-index: 1;
+        }
+
+        .gist-badge {
+            background-color: var(--gist-source-color);
+            color: white;
+        }
+
+        .elcano-badge {
+            background-color: var(--elcano-source-color);
+            color: white;
+        }
+
+        .retry-button {
+            padding: 0.5rem 1rem;
+            margin-top: 10px;
+            background-color: var(--warning);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+        }
+
         @media (max-width: 768px) {
             .channels-grid {
                 grid-template-columns: 1fr;
@@ -391,7 +425,8 @@
                 document.getElementById('darkModeToggle').textContent = '☀️';
             }
             
-            obtenerYProcesarEnlaces();
+            // Cargar datos de ambas fuentes
+            loadAllSources();
             
             // Configurar el buscador
             const searchInput = document.getElementById('searchInput');
@@ -407,62 +442,64 @@
             });
         });
 
-        function filterChannels(searchTerm) {
+        async function loadAllSources() {
             const botonesContainer = document.getElementById("channelsGrid");
-            botonesContainer.innerHTML = "";
-            
-            if (searchTerm === "") {
-                renderChannels(channelsData);
-                return;
-            }
-            
-            const filteredChannels = channelsData.filter(channel => {
-                const channelName = channel.name.toLowerCase();
-                return channelName.includes(searchTerm);
-            });
-            
-            if (filteredChannels.length === 0) {
-                const noResults = document.createElement("div");
-                noResults.className = "no-results";
-                noResults.textContent = "No se encontraron canales con ese nombre";
-                botonesContainer.appendChild(noResults);
-            } else {
-                renderChannels(filteredChannels);
-            }
-        }
-
-        async function obtenerYProcesarEnlaces() {
-            const enlacesGistUrl = "https://gist.githubusercontent.com/T22V/80b0b2d2e20ed0a455b66303b468e90b/raw";
-            const infoGistUrl = "https://gist.githubusercontent.com/T22V/ab76c1aa6c6b90fb2a9ad38dc4a66210/raw";
-            const botonesContainer = document.getElementById("channelsGrid");
+            botonesContainer.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
             
             try {
-                botonesContainer.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
-                
-                const [enlacesResponse, infoResponse] = await Promise.all([
-                    fetch(enlacesGistUrl),
-                    fetch(infoGistUrl)
+                // Cargar ambas fuentes en paralelo
+                const [gistChannels, elcanoChannels] = await Promise.all([
+                    loadGistSource(),
+                    loadElcanoSource().catch(e => []) // Si falla, devolver array vacío
                 ]);
                 
-                if (!enlacesResponse.ok) throw new Error("Error al obtener los enlaces");
-                if (!infoResponse.ok) throw new Error("Error al obtener la info de canales");
+                // Combinar los canales, eliminando duplicados por ID de Acestream
+                const combinedChannels = [...gistChannels, ...elcanoChannels];
+                const uniqueChannelsMap = new Map();
                 
-                const [enlacesContent, infoContent] = await Promise.all([
-                    enlacesResponse.text(),
-                    infoResponse.text()
-                ]);
+                combinedChannels.forEach(channel => {
+                    if (!uniqueChannelsMap.has(channel.id)) {
+                        uniqueChannelsMap.set(channel.id, channel);
+                    }
+                });
                 
-                processChannelsData(enlacesContent, infoContent);
+                channelsData = Array.from(uniqueChannelsMap.values());
+                renderChannels(channelsData);
+                
             } catch (error) {
-                console.error(error);
-                botonesContainer.innerHTML = '<div class="no-results">Error al cargar los canales</div>';
+                console.error("Error al cargar fuentes:", error);
+                botonesContainer.innerHTML = `
+                    <div class="no-results">
+                        Error al cargar los canales<br>
+                        <button class="retry-button" onclick="loadAllSources()">Reintentar</button>
+                    </div>
+                `;
             }
         }
 
-        function processChannelsData(enlaces, infoCanales) {
+        async function loadGistSource() {
+            const enlacesGistUrl = "https://gist.githubusercontent.com/T22V/80b0b2d2e20ed0a455b66303b468e90b/raw";
+            const infoGistUrl = "https://gist.githubusercontent.com/T22V/ab76c1aa6c6b90fb2a9ad38dc4a66210/raw";
+            
+            const [enlacesResponse, infoResponse] = await Promise.all([
+                fetch(enlacesGistUrl),
+                fetch(infoGistUrl)
+            ]);
+            
+            if (!enlacesResponse.ok) throw new Error("Error al obtener los enlaces Gist");
+            if (!infoResponse.ok) throw new Error("Error al obtener la info de canales Gist");
+            
+            const [enlacesContent, infoContent] = await Promise.all([
+                enlacesResponse.text(),
+                infoResponse.text()
+            ]);
+            
+            return processGistData(enlacesContent, infoContent);
+        }
+
+        function processGistData(enlaces, infoCanales) {
             const infoMap = {};
             const numberedChannels = [];
-            const additionalChannels = [];
             
             // Procesar todas las líneas del archivo de info
             infoCanales.split('\n').forEach(linea => {
@@ -501,7 +538,7 @@
                                 quality: calidad,
                                 multiAudio: multiaudio,
                                 isKnown: true,
-                                source: 'numbered'
+                                source: 'gist'
                             });
                         }
                     }
@@ -531,26 +568,129 @@
                                 quality: info.calidad,
                                 multiAudio: info.multiaudio,
                                 isKnown: info.isKnown,
-                                source: 'numbered'
+                                source: 'gist'
                             });
                         }
                     }
                 });
             
-            // Eliminar canales duplicados por ID de Acestream
-            const uniqueChannels = [];
-            const idMap = {};
+            return numberedChannels;
+        }
+
+        async function loadElcanoSource() {
+            // Usar proxy para evitar CORS
+            const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://ipfs.io/ipns/elcano.top');
             
-            numberedChannels.forEach(channel => {
-                if (!idMap[channel.id]) {
-                    idMap[channel.id] = true;
-                    uniqueChannels.push(channel);
+            const response = await fetch(proxyUrl);
+            
+            if (!response.ok) throw new Error("Error al obtener los enlaces de ElCanó");
+            
+            const htmlContent = await response.text();
+            
+            // Extraer el JSON de los enlaces usando una expresión regular mejorada
+            const jsonMatch = htmlContent.match(/const linksData\s*=\s*({[\s\S]*?});/);
+            
+            if (!jsonMatch || !jsonMatch[1]) {
+                throw new Error("No se encontraron datos de enlaces en ElCanó");
+            }
+            
+            // Limpiar y parsear el JSON
+            let jsonStr = jsonMatch[1]
+                .replace(/\s*\/\/.*(?:\n|$)/g, '') // Eliminar comentarios
+                .replace(/,\s*}/g, '}') // Eliminar comas finales
+                .replace(/,\s*]/g, ']'); // Eliminar comas finales en arrays
+            
+            const linksData = JSON.parse(jsonStr);
+            
+            if (!linksData.links || !Array.isArray(linksData.links)) {
+                throw new Error("Formato de datos incorrecto en ElCanó");
+            }
+            
+            return processElcanoData(linksData.links);
+        }
+
+        function processElcanoData(links) {
+            const numberedChannels = [];
+            let currentNumber = 500; // Empezamos desde el 500
+            
+            links.forEach(link => {
+                if (link.url && link.url.startsWith('acestream://')) {
+                    const acestreamId = link.url.split('://')[1];
+                    
+                    // Extraer información del nombre del canal
+                    let quality = '720p';
+                    let multiAudio = false;
+                    
+                    // Determinar calidad
+                    if (link.name.includes('1080')) quality = '1080p';
+                    if (link.name.includes('720')) quality = '720p';
+                    if (link.name.includes('UHD')) quality = 'UHD';
+                    
+                    // Determinar multiaudio
+                    multiAudio = link.name.includes('MultiAudio') || 
+                                 link.name.includes('Multi Audio') || 
+                                 link.name.toLowerCase().includes('multi');
+                    
+                    // Simplificar el nombre del canal
+                    let simplifiedName = link.name
+                        .replace(/1080|720|UHD|MultiAudio|Multi Audio|\(.*?\)/g, '')
+                        .replace(/\s+/g, ' ')
+                        .trim();
+                    
+                    // Añadir prefijos especiales para algunos canales
+                    if (simplifiedName.includes('M. LaLiga')) {
+                        simplifiedName = simplifiedName.replace('M. LaLiga', 'M+ La Liga');
+                    } else if (simplifiedName.includes('LaLiga Smartbank')) {
+                        simplifiedName = simplifiedName.replace('LaLiga Smartbank', 'M+ La Liga Smartbank');
+                    } else if (simplifiedName.includes('Eurosport')) {
+                        simplifiedName = '★' + simplifiedName.replace('Eurosport', 'EUROSPORT');
+                    } else if (simplifiedName.includes('MovistarPlus')) {
+                        simplifiedName = simplifiedName.replace('MovistarPlus', 'M+ Plus');
+                    } else if (simplifiedName.includes('Vamos')) {
+                        simplifiedName = simplifiedName.replace('Vamos', 'M+ Vamos');
+                    } else if (simplifiedName.includes('Deporte')) {
+                        simplifiedName = simplifiedName.replace('Deporte', 'M+ Deportes');
+                    }
+                    
+                    numberedChannels.push({
+                        id: acestreamId,
+                        number: currentNumber.toString(),
+                        name: simplifiedName,
+                        quality: quality,
+                        multiAudio: multiAudio,
+                        isKnown: true,
+                        source: 'elcano'
+                    });
+                    
+                    currentNumber++;
                 }
             });
             
-            channelsData = [...uniqueChannels];
+            return numberedChannels;
+        }
+
+        function filterChannels(searchTerm) {
+            const botonesContainer = document.getElementById("channelsGrid");
+            botonesContainer.innerHTML = "";
             
-            renderChannels(channelsData);
+            if (searchTerm === "") {
+                renderChannels(channelsData);
+                return;
+            }
+            
+            const filteredChannels = channelsData.filter(channel => {
+                const channelName = channel.name.toLowerCase();
+                return channelName.includes(searchTerm);
+            });
+            
+            if (filteredChannels.length === 0) {
+                const noResults = document.createElement("div");
+                noResults.className = "no-results";
+                noResults.textContent = "No se encontraron canales con ese nombre";
+                botonesContainer.appendChild(noResults);
+            } else {
+                renderChannels(filteredChannels);
+            }
         }
 
         function highlightBrands(text) {
@@ -610,6 +750,12 @@
                 const card = document.createElement("div");
                 card.className = `channel-card ${channel.isKnown ? '' : 'unknown'}`;
                 card.onclick = () => window.location.href = `acestream://${channel.id}`;
+                
+                // Añadir badge de fuente
+                const sourceBadge = document.createElement("span");
+                sourceBadge.className = `source-badge ${channel.source === 'gist' ? 'gist-badge' : 'elcano-badge'}`;
+                sourceBadge.textContent = channel.source === 'gist' ? 'GIST' : 'ELCANÓ';
+                card.appendChild(sourceBadge);
                 
                 const header = document.createElement("div");
                 header.className = "channel-header";
