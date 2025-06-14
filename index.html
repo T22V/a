@@ -43,6 +43,7 @@
             --eurosport-number-red: #ff3535;
             --gist-source-color: #4cc9f0;
             --elcano-source-color: #f72585;
+            --special-gist-color: #9c27b0; /* Morado para GS */
         }
 
         body.dark-mode {
@@ -361,6 +362,11 @@
             color: white;
         }
 
+        .special-gist-badge {
+            background-color: var(--special-gist-color);
+            color: white;
+        }
+
         .retry-button {
             padding: 0.5rem 1rem;
             margin-top: 10px;
@@ -430,26 +436,60 @@
         let elcanoRetries = 0;
         const MAX_ELCANO_RETRIES = 3;
         const ELCANO_BACKUP_KEY = 'a4v_elcano_backup';
-        const BACKUP_EXPIRY_HOURS = 6; // La copia de seguridad expira después de 6 horas
+        const CHANNEL_HISTORY_KEY = 'a4v_channel_history';
+        const BACKUP_EXPIRY_HOURS = 6;
+        const HISTORY_EXPIRY_HOURS = 168; // 1 semana
         
+        function saveChannelHistory(channels) {
+            const history = {
+                timestamp: new Date().getTime(),
+                channels: channels
+            };
+            localStorage.setItem(CHANNEL_HISTORY_KEY, JSON.stringify(history));
+        }
+
+        function loadChannelHistory() {
+            const history = localStorage.getItem(CHANNEL_HISTORY_KEY);
+            if (!history) return null;
+            
+            const parsedHistory = JSON.parse(history);
+            const backupAgeHours = (new Date().getTime() - parsedHistory.timestamp) / (1000 * 60 * 60);
+            
+            if (backupAgeHours > HISTORY_EXPIRY_HOURS) {
+                localStorage.removeItem(CHANNEL_HISTORY_KEY);
+                return null;
+            }
+            
+            return parsedHistory.channels;
+        }
+
+        function isSameChannel(oldChan, newChan) {
+            return oldChan.name === newChan.name && 
+                   oldChan.quality === newChan.quality && 
+                   oldChan.multiAudio === newChan.multiAudio;
+        }
+
+        function mergeChannels(oldChannels, newChannels) {
+            const uniqueGistChannels = oldChannels.filter(oldChan => 
+                !newChannels.some(newChan => newChan.id === oldChan.id)
+            );
+            return [...uniqueGistChannels, ...newChannels];
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
-            // Estado para el modo oscuro
             const isDarkMode = localStorage.getItem('darkMode') === 'true';
             if (isDarkMode) {
                 document.body.classList.add('dark-mode');
                 document.getElementById('darkModeToggle').textContent = '☀️';
             }
             
-            // Cargar primero los canales de Gist (rápidos) y mostrar backup de ElCanó si existe
             loadInitialChannels();
             
-            // Configurar el buscador
             const searchInput = document.getElementById('searchInput');
             searchInput.addEventListener('input', function() {
                 filterChannels(this.value.toLowerCase());
             });
 
-            // Configurar el toggle de modo oscuro
             document.getElementById('darkModeToggle').addEventListener('click', function() {
                 const isDark = document.body.classList.toggle('dark-mode');
                 localStorage.setItem('darkMode', isDark);
@@ -457,7 +497,6 @@
             });
         });
 
-        // Función para guardar la copia de seguridad de ElCanó
         function saveElcanoBackup(data) {
             const backupData = {
                 timestamp: new Date().getTime(),
@@ -466,7 +505,6 @@
             localStorage.setItem(ELCANO_BACKUP_KEY, JSON.stringify(backupData));
         }
 
-        // Función para cargar la copia de seguridad de ElCanó
         function loadElcanoBackup() {
             const backup = localStorage.getItem(ELCANO_BACKUP_KEY);
             if (!backup) return null;
@@ -474,7 +512,6 @@
             const parsedBackup = JSON.parse(backup);
             const backupAgeHours = (new Date().getTime() - parsedBackup.timestamp) / (1000 * 60 * 60);
             
-            // Si la copia de seguridad es demasiado vieja, la ignoramos
             if (backupAgeHours > BACKUP_EXPIRY_HOURS) {
                 localStorage.removeItem(ELCANO_BACKUP_KEY);
                 return null;
@@ -483,28 +520,31 @@
             return parsedBackup.data;
         }
 
-        // Función principal que carga los canales iniciales
         async function loadInitialChannels() {
             const botonesContainer = document.getElementById("channelsGrid");
             botonesContainer.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
             
             try {
-                // 1. Cargar canales de Gist (siempre frescos)
                 const gistChannels = await loadGistChannels();
+                const historicalChannels = loadChannelHistory();
                 
-                // 2. Mostrar canales de ElCanó desde backup (si existen) mientras se hace scraping
-                const elcanoBackup = loadElcanoBackup();
-                if (elcanoBackup && elcanoBackup.length > 0) {
-                    channelsData = [...gistChannels, ...elcanoBackup];
+                if (historicalChannels && historicalChannels.length > 0) {
+                    channelsData = mergeChannels(gistChannels, historicalChannels);
                     renderChannels(channelsData);
-                    showStatusMessage("Mostrando copia de seguridad de canales adicionales mientras se actualizan...");
+                    showStatusMessage("Mostrando canales históricos mientras se actualizan...");
                 } else {
-                    channelsData = gistChannels;
-                    renderChannels(channelsData);
-                    showStatusMessage("Cargando canales adicionales...");
+                    const elcanoBackup = loadElcanoBackup();
+                    if (elcanoBackup && elcanoBackup.length > 0) {
+                        channelsData = mergeChannels(gistChannels, elcanoBackup);
+                        renderChannels(channelsData);
+                        showStatusMessage("Mostrando copia de seguridad de canales adicionales...");
+                    } else {
+                        channelsData = gistChannels;
+                        renderChannels(channelsData);
+                        showStatusMessage("Cargando canales adicionales...");
+                    }
                 }
                 
-                // 3. Intentar cargar los nuevos datos de ElCanó en segundo plano
                 loadElcanoChannels();
                 
             } catch (error) {
@@ -542,17 +582,12 @@
             const infoMap = {};
             const numberedChannels = [];
             
-            // Procesar todas las líneas del archivo de info
             infoCanales.split('\n').forEach(linea => {
                 linea = linea.trim();
                 if (!linea) return;
                 
-                // Dividir la línea por comas
                 const parts = linea.split(',').map(part => part.trim());
                 
-                // El formato puede ser:
-                // 1) Para canales <500: num, nombre, calidad, multiaudio
-                // 2) Para canales >=500: num, nombre, calidad, multiaudio, acestream://id
                 if (parts.length >= 4) {
                     const num = parts[0];
                     const nombre = parts[1];
@@ -566,7 +601,6 @@
                         isKnown: true
                     };
                     
-                    // Si es un canal >=500 y tiene enlace Acestream (parts[4])
                     if (parseInt(num) >= 500 && parts.length >= 5 && parts[4]) {
                         const acestreamId = parts[4].match(/acestream:\/\/([a-fA-F0-9]+)/)?.[1] || 
                                            parts[4].match(/([a-fA-F0-9]{40})/)?.[1];
@@ -579,19 +613,17 @@
                                 quality: calidad,
                                 multiAudio: multiaudio,
                                 isKnown: true,
-                                source: 'gist'
+                                source: 'special-gist' // Identificador para canales especiales
                             });
                         }
                     }
                 }
             });
             
-            // Procesar enlaces numerados (para canales <500)
             enlaces.split(/\n+/)
                 .filter(linea => linea.trim() !== "")
                 .forEach((linea, index) => {
                     const numCanal = (index + 1).toString();
-                    // Solo procesar si el número es menor a 500
                     if (parseInt(numCanal) < 500) {
                         const info = infoMap[numCanal] || {
                             nombre: `Canal ${numCanal}`,
@@ -609,7 +641,7 @@
                                 quality: info.calidad,
                                 multiAudio: info.multiaudio,
                                 isKnown: info.isKnown,
-                                source: 'gist'
+                                source: 'gist' // Identificador para canales normales
                             });
                         }
                     }
@@ -623,29 +655,27 @@
             
             try {
                 const elcanoChannels = await loadElcanoSource();
+                const historicalChannels = loadChannelHistory() || [];
                 
-                // Guardar nueva copia de seguridad
-                saveElcanoBackup(elcanoChannels);
+                const mergedChannels = mergeChannels(historicalChannels, elcanoChannels);
+                saveChannelHistory(mergedChannels);
                 
-                // Combinar con los canales de Gist (sin duplicados)
                 const uniqueChannelsMap = new Map();
                 
-                // Primero añadimos los canales existentes (de Gist)
                 channelsData.forEach(channel => {
-                    if (channel.source === 'gist') {
+                    if (channel.source === 'gist' || channel.source === 'special-gist') {
                         uniqueChannelsMap.set(channel.id, channel);
                     }
                 });
                 
-                // Luego añadimos los de ElCanó (sobrescriben si tienen el mismo ID)
-                elcanoChannels.forEach(channel => {
+                mergedChannels.forEach(channel => {
                     uniqueChannelsMap.set(channel.id, channel);
                 });
                 
                 channelsData = Array.from(uniqueChannelsMap.values());
                 renderChannels(channelsData);
                 showStatusMessage("Canales adicionales actualizados correctamente");
-                elcanoRetries = 0; // Resetear contador de reintentos
+                elcanoRetries = 0;
                 
             } catch (error) {
                 console.error("Error al cargar ElCanó:", error);
@@ -654,10 +684,17 @@
                 if (elcanoRetries <= MAX_ELCANO_RETRIES) {
                     console.log(`Reintentando ElCanó (${elcanoRetries}/${MAX_ELCANO_RETRIES})...`);
                     showStatusMessage(`Error al actualizar, reintentando... (Intento ${elcanoRetries}/${MAX_ELCANO_RETRIES})`, "error");
-                    setTimeout(loadElcanoChannels, 2000 * elcanoRetries); // Espera exponencial
+                    setTimeout(loadElcanoChannels, 2000 * elcanoRetries);
                 } else {
                     console.log("Máximo de reintentos alcanzado para ElCanó");
                     showStatusMessage("No se pudieron actualizar los canales adicionales. Mostrando copia de seguridad.", "error");
+                    
+                    const historicalChannels = loadChannelHistory();
+                    if (historicalChannels && historicalChannels.length > 0) {
+                        const gistChannels = channelsData.filter(c => c.source === 'gist' || c.source === 'special-gist');
+                        channelsData = [...gistChannels, ...historicalChannels];
+                        renderChannels(channelsData);
+                    }
                 }
             }
         }
@@ -710,33 +747,28 @@
 
         function processElcanoData(links) {
             const numberedChannels = [];
-            let currentNumber = 500; // Empezamos desde el 500
+            let currentNumber = 500;
             
             links.forEach(link => {
                 if (link.url && link.url.startsWith('acestream://')) {
                     const acestreamId = link.url.split('://')[1];
                     
-                    // Extraer información del nombre del canal
                     let quality = '720p';
                     let multiAudio = false;
                     
-                    // Determinar calidad
                     if (link.name.includes('1080')) quality = '1080p';
                     if (link.name.includes('720')) quality = '720p';
                     if (link.name.includes('UHD')) quality = 'UHD';
                     
-                    // Determinar multiaudio
                     multiAudio = link.name.includes('MultiAudio') || 
                                  link.name.includes('Multi Audio') || 
                                  link.name.toLowerCase().includes('multi');
                     
-                    // Simplificar el nombre del canal
                     let simplifiedName = link.name
                         .replace(/1080|720|UHD|MultiAudio|Multi Audio|\(.*?\)/g, '')
                         .replace(/\s+/g, ' ')
                         .trim();
                     
-                    // Añadir prefijos especiales para algunos canales
                     if (simplifiedName.includes('M. LaLiga')) {
                         simplifiedName = simplifiedName.replace('M. LaLiga', 'M+ La Liga');
                     } else if (simplifiedName.includes('LaLiga Smartbank')) {
@@ -850,23 +882,19 @@
         function renderChannels(channels) {
             const botonesContainer = document.getElementById("channelsGrid");
             
-            // Mantener el mensaje de estado si existe
             const statusMessage = document.querySelector(".status-message");
             botonesContainer.innerHTML = "";
             if (statusMessage) {
                 botonesContainer.appendChild(statusMessage);
             }
             
-            // Ordenar los canales: primero por si es OFF (los OFF van al final), luego por nombre
             const sortedChannels = [...channels].sort((a, b) => {
-                // Si un canal es OFF y el otro no, el OFF va después
                 const aIsOff = a.name.includes('OFF');
                 const bIsOff = b.name.includes('OFF');
                 
                 if (aIsOff && !bIsOff) return 1;
                 if (!aIsOff && bIsOff) return -1;
                 
-                // Si ambos son OFF o ninguno es OFF, ordenar por nombre
                 return a.name.localeCompare(b.name);
             });
             
@@ -875,10 +903,14 @@
                 card.className = `channel-card ${channel.isKnown ? '' : 'unknown'}`;
                 card.onclick = () => window.location.href = `acestream://${channel.id}`;
                 
-                // Añadir badge de fuente
                 const sourceBadge = document.createElement("span");
-                sourceBadge.className = `source-badge ${channel.source === 'gist' ? 'gist-badge' : 'elcano-badge'}`;
-                sourceBadge.textContent = channel.source === 'gist' ? 'NE' : 'EC';
+                sourceBadge.className = `source-badge ${
+                    channel.source === 'elcano' ? 'elcano-badge' : 
+                    channel.source === 'special-gist' ? 'special-gist-badge' : 'gist-badge'
+                }`;
+                sourceBadge.textContent = 
+                    channel.source === 'elcano' ? 'EC' : 
+                    channel.source === 'special-gist' ? 'GS' : 'NE';
                 card.appendChild(sourceBadge);
                 
                 const header = document.createElement("div");
