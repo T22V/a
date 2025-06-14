@@ -429,6 +429,8 @@
         let channelsData = [];
         let elcanoRetries = 0;
         const MAX_ELCANO_RETRIES = 3;
+        const ELCANO_BACKUP_KEY = 'a4v_elcano_backup';
+        const BACKUP_EXPIRY_HOURS = 6; // La copia de seguridad expira después de 6 horas
         
         document.addEventListener('DOMContentLoaded', function() {
             // Estado para el modo oscuro
@@ -438,8 +440,8 @@
                 document.getElementById('darkModeToggle').textContent = '☀️';
             }
             
-            // Cargar primero los canales de Gist (rápidos)
-            loadGistChannels();
+            // Cargar primero los canales de Gist (rápidos) y mostrar backup de ElCanó si existe
+            loadInitialChannels();
             
             // Configurar el buscador
             const searchInput = document.getElementById('searchInput');
@@ -455,84 +457,68 @@
             });
         });
 
-        async function loadGistChannels() {
+        // Función para guardar la copia de seguridad de ElCanó
+        function saveElcanoBackup(data) {
+            const backupData = {
+                timestamp: new Date().getTime(),
+                data: data
+            };
+            localStorage.setItem(ELCANO_BACKUP_KEY, JSON.stringify(backupData));
+        }
+
+        // Función para cargar la copia de seguridad de ElCanó
+        function loadElcanoBackup() {
+            const backup = localStorage.getItem(ELCANO_BACKUP_KEY);
+            if (!backup) return null;
+            
+            const parsedBackup = JSON.parse(backup);
+            const backupAgeHours = (new Date().getTime() - parsedBackup.timestamp) / (1000 * 60 * 60);
+            
+            // Si la copia de seguridad es demasiado vieja, la ignoramos
+            if (backupAgeHours > BACKUP_EXPIRY_HOURS) {
+                localStorage.removeItem(ELCANO_BACKUP_KEY);
+                return null;
+            }
+            
+            return parsedBackup.data;
+        }
+
+        // Función principal que carga los canales iniciales
+        async function loadInitialChannels() {
             const botonesContainer = document.getElementById("channelsGrid");
             botonesContainer.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
             
             try {
-                const gistChannels = await loadGistSource();
-                channelsData = gistChannels;
-                renderChannels(channelsData);
+                // 1. Cargar canales de Gist (siempre frescos)
+                const gistChannels = await loadGistChannels();
                 
-                // Mostrar mensaje de que se están cargando más canales
-                showStatusMessage("Cargando más canales en segundo plano...");
+                // 2. Mostrar canales de ElCanó desde backup (si existen) mientras se hace scraping
+                const elcanoBackup = loadElcanoBackup();
+                if (elcanoBackup && elcanoBackup.length > 0) {
+                    channelsData = [...gistChannels, ...elcanoBackup];
+                    renderChannels(channelsData);
+                    showStatusMessage("Mostrando copia de seguridad de canales adicionales mientras se actualizan...");
+                } else {
+                    channelsData = gistChannels;
+                    renderChannels(channelsData);
+                    showStatusMessage("Cargando canales adicionales...");
+                }
                 
-                // Ahora cargar ElCanó en segundo plano
+                // 3. Intentar cargar los nuevos datos de ElCanó en segundo plano
                 loadElcanoChannels();
+                
             } catch (error) {
-                console.error("Error al cargar Gist:", error);
+                console.error("Error al cargar canales iniciales:", error);
                 botonesContainer.innerHTML = `
                     <div class="no-results">
                         Error al cargar los canales principales<br>
-                        <button class="retry-button" onclick="loadGistChannels()">Reintentar</button>
+                        <button class="retry-button" onclick="loadInitialChannels()">Reintentar</button>
                     </div>
                 `;
             }
         }
 
-        async function loadElcanoChannels() {
-            try {
-                const elcanoChannels = await loadElcanoSource();
-                
-                // Combinar los canales, eliminando duplicados por ID de Acestream
-                const uniqueChannelsMap = new Map();
-                
-                // Primero añadimos los canales existentes (de Gist)
-                channelsData.forEach(channel => {
-                    uniqueChannelsMap.set(channel.id, channel);
-                });
-                
-                // Luego añadimos los de ElCanó (sobrescriben si tienen el mismo ID)
-                elcanoChannels.forEach(channel => {
-                    uniqueChannelsMap.set(channel.id, channel);
-                });
-                
-                channelsData = Array.from(uniqueChannelsMap.values());
-                renderChannels(channelsData);
-                showStatusMessage("Todos los canales cargados correctamente");
-                elcanoRetries = 0; // Resetear contador de reintentos
-                
-            } catch (error) {
-                console.error("Error al cargar ElCanó:", error);
-                elcanoRetries++;
-                
-                if (elcanoRetries <= MAX_ELCANO_RETRIES) {
-                    console.log(`Reintentando ElCanó (${elcanoRetries}/${MAX_ELCANO_RETRIES})...`);
-                    showStatusMessage(`Intentando cargar más canales... (Intento ${elcanoRetries}/${MAX_ELCANO_RETRIES})`);
-                    setTimeout(loadElcanoChannels, 2000 * elcanoRetries); // Espera exponencial
-                } else {
-                    console.log("Máximo de reintentos alcanzado para ElCanó");
-                    showStatusMessage("No se pudieron cargar todos los canales adicionales", "error");
-                }
-            }
-        }
-
-        function showStatusMessage(message, type = "info") {
-            let statusElement = document.querySelector(".status-message");
-            
-            if (!statusElement) {
-                statusElement = document.createElement("div");
-                statusElement.className = "status-message";
-                const channelsGrid = document.getElementById("channelsGrid");
-                channelsGrid.insertBefore(statusElement, channelsGrid.firstChild);
-            }
-            
-            statusElement.textContent = message;
-            statusElement.style.color = type === "error" ? "var(--secondary)" : "var(--success)";
-            statusElement.style.backgroundColor = type === "error" ? "rgba(247, 37, 133, 0.1)" : "rgba(76, 201, 240, 0.1)";
-        }
-
-        async function loadGistSource() {
+        async function loadGistChannels() {
             const enlacesGistUrl = "https://gist.githubusercontent.com/T22V/80b0b2d2e20ed0a455b66303b468e90b/raw";
             const infoGistUrl = "https://gist.githubusercontent.com/T22V/ab76c1aa6c6b90fb2a9ad38dc4a66210/raw";
             
@@ -632,36 +618,94 @@
             return numberedChannels;
         }
 
+        async function loadElcanoChannels() {
+            showStatusMessage("Actualizando canales adicionales... (esto puede tomar un momento)");
+            
+            try {
+                const elcanoChannels = await loadElcanoSource();
+                
+                // Guardar nueva copia de seguridad
+                saveElcanoBackup(elcanoChannels);
+                
+                // Combinar con los canales de Gist (sin duplicados)
+                const uniqueChannelsMap = new Map();
+                
+                // Primero añadimos los canales existentes (de Gist)
+                channelsData.forEach(channel => {
+                    if (channel.source === 'gist') {
+                        uniqueChannelsMap.set(channel.id, channel);
+                    }
+                });
+                
+                // Luego añadimos los de ElCanó (sobrescriben si tienen el mismo ID)
+                elcanoChannels.forEach(channel => {
+                    uniqueChannelsMap.set(channel.id, channel);
+                });
+                
+                channelsData = Array.from(uniqueChannelsMap.values());
+                renderChannels(channelsData);
+                showStatusMessage("Canales adicionales actualizados correctamente");
+                elcanoRetries = 0; // Resetear contador de reintentos
+                
+            } catch (error) {
+                console.error("Error al cargar ElCanó:", error);
+                elcanoRetries++;
+                
+                if (elcanoRetries <= MAX_ELCANO_RETRIES) {
+                    console.log(`Reintentando ElCanó (${elcanoRetries}/${MAX_ELCANO_RETRIES})...`);
+                    showStatusMessage(`Error al actualizar, reintentando... (Intento ${elcanoRetries}/${MAX_ELCANO_RETRIES})`, "error");
+                    setTimeout(loadElcanoChannels, 2000 * elcanoRetries); // Espera exponencial
+                } else {
+                    console.log("Máximo de reintentos alcanzado para ElCanó");
+                    showStatusMessage("No se pudieron actualizar los canales adicionales. Mostrando copia de seguridad.", "error");
+                }
+            }
+        }
+
         async function loadElcanoSource() {
-            // Usar proxy para evitar CORS
-            const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent('https://ipfs.io/ipns/elcano.top');
+            const PROXIES = [
+                'https://api.allorigins.win/raw?url=',
+                'https://cors-anywhere.herokuapp.com/',
+                'https://api.codetabs.com/v1/proxy/?quest='
+            ];
             
-            const response = await fetch(proxyUrl);
+            let lastError;
             
-            if (!response.ok) throw new Error("Error al obtener los enlaces de ElCanó");
-            
-            const htmlContent = await response.text();
-            
-            // Extraer el JSON de los enlaces usando una expresión regular mejorada
-            const jsonMatch = htmlContent.match(/const linksData\s*=\s*({[\s\S]*?});/);
-            
-            if (!jsonMatch || !jsonMatch[1]) {
-                throw new Error("No se encontraron datos de enlaces en ElCanó");
+            for (const proxy of PROXIES) {
+                try {
+                    console.log(`Intentando con proxy: ${proxy}`);
+                    const proxyUrl = proxy + encodeURIComponent('https://ipfs.io/ipns/elcano.top');
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+                    
+                    const response = await fetch(proxyUrl, { 
+                        signal: controller.signal 
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) throw new Error(`Proxy ${proxy} responded with ${response.status}`);
+                    
+                    const htmlContent = await response.text();
+                    const jsonMatch = htmlContent.match(/const linksData\s*=\s*({[\s\S]*?});/);
+                    
+                    if (!jsonMatch) throw new Error("Data format changed");
+                    
+                    const linksData = JSON.parse(jsonMatch[1]
+                        .replace(/\s*\/\/.*(?:\n|$)/g, '')
+                        .replace(/,\s*}/g, '}')
+                        .replace(/,\s*]/g, ']'));
+                        
+                    return processElcanoData(linksData.links || []);
+                    
+                } catch (error) {
+                    lastError = error;
+                    console.warn(`Proxy ${proxy} failed:`, error);
+                    continue;
+                }
             }
             
-            // Limpiar y parsear el JSON
-            let jsonStr = jsonMatch[1]
-                .replace(/\s*\/\/.*(?:\n|$)/g, '') // Eliminar comentarios
-                .replace(/,\s*}/g, '}') // Eliminar comas finales
-                .replace(/,\s*]/g, ']'); // Eliminar comas finales en arrays
-            
-            const linksData = JSON.parse(jsonStr);
-            
-            if (!linksData.links || !Array.isArray(linksData.links)) {
-                throw new Error("Formato de datos incorrecto en ElCanó");
-            }
-            
-            return processElcanoData(linksData.links);
+            throw lastError || new Error("All proxies failed");
         }
 
         function processElcanoData(links) {
@@ -703,8 +747,12 @@
                         simplifiedName = simplifiedName.replace('MovistarPlus', 'M+ Plus');
                     } else if (simplifiedName.includes('Vamos')) {
                         simplifiedName = simplifiedName.replace('Vamos', 'M+ Vamos');
-                    } else if (simplifiedName.includes('Deporte')) {
-                        simplifiedName = simplifiedName.replace('Deporte', 'M+ Deportes');
+                    } else if (simplifiedName.includes('Deporte') || simplifiedName.includes('Dedporte')) {
+                        simplifiedName = simplifiedName.replace('Deporte', 'M+ Deportes').replace('Dedporte', 'M+ Deportes');
+                    } else if (simplifiedName.includes('Dazn')) {
+                        simplifiedName = simplifiedName.replace('Dazn', 'DAZN');
+                    } else if (simplifiedName.includes('Campeones')) {
+                        simplifiedName = simplifiedName.replace('Campeones', 'M+ Liga de Campeones');
                     }
                     
                     numberedChannels.push({
@@ -722,6 +770,21 @@
             });
             
             return numberedChannels;
+        }
+
+        function showStatusMessage(message, type = "info") {
+            let statusElement = document.querySelector(".status-message");
+            
+            if (!statusElement) {
+                statusElement = document.createElement("div");
+                statusElement.className = "status-message";
+                const channelsGrid = document.getElementById("channelsGrid");
+                channelsGrid.insertBefore(statusElement, channelsGrid.firstChild);
+            }
+            
+            statusElement.textContent = message;
+            statusElement.style.color = type === "error" ? "var(--secondary)" : "var(--success)";
+            statusElement.style.backgroundColor = type === "error" ? "rgba(247, 37, 133, 0.1)" : "rgba(76, 201, 240, 0.1)";
         }
 
         function filterChannels(searchTerm) {
@@ -854,4 +917,4 @@
         }
     </script>
 </body>
-</html></html>
+</html>
