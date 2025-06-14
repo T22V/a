@@ -36,14 +36,16 @@
             --sports-green: #11a45b;
             --vamos-green: #1fc23d;
             --copadelrey-green: #449653;
-            --champions-teal: #00dd96;
+            --champions-teal: #52c29c;
             --liga-teal: #21ffb8;
             --hypermotion-cyan: #04d2d7;
             --golf-teal: #4ee1b0;
             --eurosport-number-red: #ff3535;
             --gist-source-color: #4cc9f0;
             --elcano-source-color: #f72585;
-            --special-gist-color: #9c27b0; /* Morado para GS */
+            --special-gist-color: #9c27b0;
+            --smartbank-red: #a82705;
+            --plus-black: #000000;
         }
 
         body.dark-mode {
@@ -294,7 +296,7 @@
         }
 
         .dazn {
-            color: #000000 !important;
+            color: var(--dazn-black) !important;
         }
 
         .f1 {
@@ -339,6 +341,14 @@
 
         .eurosport-number {
             color: var(--eurosport-number-red) !important;
+        }
+
+        .smartbank {
+            color: var(--smartbank-red) !important;
+        }
+
+        .plus {
+            color: var(--plus-black) !important;
         }
 
         .source-badge {
@@ -860,7 +870,11 @@
                 { name: 'La Liga', class: 'liga' },
                 { name: 'Hypermotion', class: 'hypermotion' },
                 { name: 'Golf', class: 'golf' },
-                { name: '★Eurosport \\d+', class: 'eurosport-number', regex: true }
+                { name: '★Eurosport \\d+', class: 'eurosport-number', regex: true },
+                { name: 'Smartbank', class: 'smartbank' },
+                { name: 'La Liga Smartbank', class: 'smartbank' },
+                { name: 'Plus', class: 'plus' },
+                { name: 'M+ Plus', class: 'plus' }
             ];
 
             let result = text;
