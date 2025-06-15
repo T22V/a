@@ -46,6 +46,7 @@
             --special-gist-color: #9c27b0;
             --smartbank-red: #f72585;
             --plus-black: #000000;
+            --events-source-color: #f8961e;
         }
 
         body.light-mode {
@@ -377,6 +378,11 @@
             color: white;
         }
 
+        .events-badge {
+            background-color: var(--events-source-color);
+            color: white;
+        }
+
         .retry-button {
             padding: 0.5rem 1rem;
             margin-top: 10px;
@@ -444,8 +450,10 @@
         let allChannels = [];
         let channelsData = [];
         let elcanoRetries = 0;
-        const MAX_ELCANO_RETRIES = 3;
+        let eventsRetries = 0;
+        const MAX_RETRIES = 3;
         const ELCANO_BACKUP_KEY = 'a4v_elcano_backup';
+        const EVENTS_BACKUP_KEY = 'a4v_events_backup';
         const CHANNEL_HISTORY_KEY = 'a4v_channel_history';
         const BACKUP_EXPIRY_HOURS = 6;
         const HISTORY_EXPIRY_HOURS = 168; // 1 semana
@@ -507,23 +515,23 @@
             });
         });
 
-        function saveElcanoBackup(data) {
+        function saveBackup(data, key) {
             const backupData = {
                 timestamp: new Date().getTime(),
                 data: data
             };
-            localStorage.setItem(ELCANO_BACKUP_KEY, JSON.stringify(backupData));
+            localStorage.setItem(key, JSON.stringify(backupData));
         }
 
-        function loadElcanoBackup() {
-            const backup = localStorage.getItem(ELCANO_BACKUP_KEY);
+        function loadBackup(key) {
+            const backup = localStorage.getItem(key);
             if (!backup) return null;
             
             const parsedBackup = JSON.parse(backup);
             const backupAgeHours = (new Date().getTime() - parsedBackup.timestamp) / (1000 * 60 * 60);
             
             if (backupAgeHours > BACKUP_EXPIRY_HOURS) {
-                localStorage.removeItem(ELCANO_BACKUP_KEY);
+                localStorage.removeItem(key);
                 return null;
             }
             
@@ -543,19 +551,26 @@
                     renderChannels(channelsData);
                     showStatusMessage("Mostrando canales históricos mientras se actualizan...");
                 } else {
-                    const elcanoBackup = loadElcanoBackup();
+                    const elcanoBackup = loadBackup(ELCANO_BACKUP_KEY);
+                    const eventsBackup = loadBackup(EVENTS_BACKUP_KEY);
+                    
+                    let mergedChannels = gistChannels;
+                    
                     if (elcanoBackup && elcanoBackup.length > 0) {
-                        channelsData = mergeChannels(gistChannels, elcanoBackup);
-                        renderChannels(channelsData);
-                        showStatusMessage("Mostrando copia de seguridad de canales adicionales...");
-                    } else {
-                        channelsData = gistChannels;
-                        renderChannels(channelsData);
-                        showStatusMessage("Cargando canales adicionales...");
+                        mergedChannels = mergeChannels(mergedChannels, elcanoBackup);
                     }
+                    
+                    if (eventsBackup && eventsBackup.length > 0) {
+                        mergedChannels = mergeChannels(mergedChannels, eventsBackup);
+                    }
+                    
+                    channelsData = mergedChannels;
+                    renderChannels(channelsData);
+                    showStatusMessage("Cargando canales adicionales...");
                 }
                 
                 loadElcanoChannels();
+                loadEventsChannels();
                 
             } catch (error) {
                 console.error("Error al cargar canales iniciales:", error);
@@ -669,6 +684,7 @@
                 
                 const mergedChannels = mergeChannels(historicalChannels, elcanoChannels);
                 saveChannelHistory(mergedChannels);
+                saveBackup(elcanoChannels, ELCANO_BACKUP_KEY);
                 
                 const uniqueChannelsMap = new Map();
                 
@@ -691,9 +707,9 @@
                 console.error("Error al cargar ElCanó:", error);
                 elcanoRetries++;
                 
-                if (elcanoRetries <= MAX_ELCANO_RETRIES) {
-                    console.log(`Reintentando ElCanó (${elcanoRetries}/${MAX_ELCANO_RETRIES})...`);
-                    showStatusMessage(`Error al actualizar, reintentando... (Intento ${elcanoRetries}/${MAX_ELCANO_RETRIES})`, "error");
+                if (elcanoRetries <= MAX_RETRIES) {
+                    console.log(`Reintentando ElCanó (${elcanoRetries}/${MAX_RETRIES})...`);
+                    showStatusMessage(`Error al actualizar, reintentando... (Intento ${elcanoRetries}/${MAX_RETRIES})`, "error");
                     setTimeout(loadElcanoChannels, 2000 * elcanoRetries);
                 } else {
                     console.log("Máximo de reintentos alcanzado para ElCanó");
@@ -703,6 +719,50 @@
                     if (historicalChannels && historicalChannels.length > 0) {
                         const gistChannels = channelsData.filter(c => c.source === 'gist' || c.source === 'special-gist');
                         channelsData = [...gistChannels, ...historicalChannels];
+                        renderChannels(channelsData);
+                    }
+                }
+            }
+        }
+
+        async function loadEventsChannels() {
+            showStatusMessage("Actualizando eventos deportivos... (esto puede tomar un momento)");
+            
+            try {
+                const eventsChannels = await loadEventsSource();
+                saveBackup(eventsChannels, EVENTS_BACKUP_KEY);
+                
+                const uniqueChannelsMap = new Map();
+                
+                channelsData.forEach(channel => {
+                    uniqueChannelsMap.set(channel.id, channel);
+                });
+                
+                eventsChannels.forEach(channel => {
+                    uniqueChannelsMap.set(channel.id, channel);
+                });
+                
+                channelsData = Array.from(uniqueChannelsMap.values());
+                renderChannels(channelsData);
+                showStatusMessage("Eventos deportivos actualizados correctamente");
+                eventsRetries = 0;
+                
+            } catch (error) {
+                console.error("Error al cargar eventos deportivos:", error);
+                eventsRetries++;
+                
+                if (eventsRetries <= MAX_RETRIES) {
+                    console.log(`Reintentando eventos deportivos (${eventsRetries}/${MAX_RETRIES})...`);
+                    showStatusMessage(`Error al actualizar eventos, reintentando... (Intento ${eventsRetries}/${MAX_RETRIES})`, "error");
+                    setTimeout(loadEventsChannels, 2000 * eventsRetries);
+                } else {
+                    console.log("Máximo de reintentos alcanzado para eventos deportivos");
+                    showStatusMessage("No se pudieron actualizar los eventos deportivos. Mostrando copia de seguridad.", "error");
+                    
+                    const eventsBackup = loadBackup(EVENTS_BACKUP_KEY);
+                    if (eventsBackup && eventsBackup.length > 0) {
+                        const otherChannels = channelsData.filter(c => c.source !== 'events');
+                        channelsData = [...otherChannels, ...eventsBackup];
                         renderChannels(channelsData);
                     }
                 }
@@ -744,6 +804,43 @@
                         .replace(/,\s*]/g, ']'));
                         
                     return processElcanoData(linksData.links || []);
+                    
+                } catch (error) {
+                    lastError = error;
+                    console.warn(`Proxy ${proxy} failed:`, error);
+                    continue;
+                }
+            }
+            
+            throw lastError || new Error("All proxies failed");
+        }
+
+        async function loadEventsSource() {
+            const PROXIES = [
+                'https://api.allorigins.win/raw?url=',
+                'https://cors-anywhere.herokuapp.com/',
+                'https://api.codetabs.com/v1/proxy/?quest='
+            ];
+            
+            let lastError;
+            
+            for (const proxy of PROXIES) {
+                try {
+                    console.log(`Intentando con proxy: ${proxy}`);
+                    const proxyUrl = proxy + encodeURIComponent('https://eventos-liartvercelapp.vercel.app/');
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000);
+                    
+                    const response = await fetch(proxyUrl, { 
+                        signal: controller.signal 
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    
+                    if (!response.ok) throw new Error(`Proxy ${proxy} responded with ${response.status}`);
+                    
+                    const htmlContent = await response.text();
+                    return processEventsData(htmlContent);
                     
                 } catch (error) {
                     lastError = error;
@@ -810,6 +907,50 @@
                     });
                     
                     currentNumber++;
+                }
+            });
+            
+            return numberedChannels;
+        }
+
+        function processEventsData(htmlContent) {
+            const numberedChannels = [];
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlContent, 'text/html');
+            const rows = doc.querySelectorAll('table tbody tr');
+            
+            let currentNumber = 1000; // Empezamos desde 1000 para los eventos
+            
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 6) {
+                    const canalesCell = cells[5];
+                    const links = canalesCell.querySelectorAll('a[href^="acestream://"]');
+                    
+                    links.forEach(link => {
+                        const acestreamId = link.href.split('://')[1];
+                        const channelName = link.textContent.trim();
+                        
+                        // Extraer calidad del nombre si es posible
+                        let quality = '720p';
+                        if (channelName.includes('1080')) quality = '1080p';
+                        if (channelName.includes('UHD')) quality = 'UHD';
+                        
+                        // Asumir que no hay multiaudio en estos eventos
+                        const multiAudio = false;
+                        
+                        numberedChannels.push({
+                            id: acestreamId,
+                            number: currentNumber.toString(),
+                            name: channelName,
+                            quality: quality,
+                            multiAudio: multiAudio,
+                            isKnown: true,
+                            source: 'events'
+                        });
+                        
+                        currentNumber++;
+                    });
                 }
             });
             
@@ -922,11 +1063,13 @@
                 const sourceBadge = document.createElement("span");
                 sourceBadge.className = `source-badge ${
                     channel.source === 'elcano' ? 'elcano-badge' : 
-                    channel.source === 'special-gist' ? 'special-gist-badge' : 'gist-badge'
+                    channel.source === 'special-gist' ? 'special-gist-badge' : 
+                    channel.source === 'events' ? 'events-badge' : 'gist-badge'
                 }`;
                 sourceBadge.textContent = 
                     channel.source === 'elcano' ? 'EC' : 
-                    channel.source === 'special-gist' ? 'GS' : 'NE';
+                    channel.source === 'special-gist' ? 'GS' : 
+                    channel.source === 'events' ? 'EV' : 'NE';
                 card.appendChild(sourceBadge);
                 
                 const header = document.createElement("div");
