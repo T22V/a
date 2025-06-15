@@ -929,7 +929,29 @@
                     
                     links.forEach(link => {
                         const acestreamId = link.href.split('://')[1];
-                        const channelName = link.textContent.trim();
+                        let channelName = link.textContent.trim();
+                        
+                        // Eliminar (OpXX) del nombre del canal
+                        channelName = channelName.replace(/\s*\(Op\d+\)/g, '');
+                        
+                        // Simplificar nombres específicos para eventos
+                        let simplifiedName = channelName
+                            .replace(/1080|720|UHD|MultiAudio|Multi Audio|\(.*?\)/g, '')
+                            .replace(/\s+/g, ' ')
+                            .trim();
+
+                        // Lógica específica para eventos
+                        if (simplifiedName.includes('Vamos')) {
+                            simplifiedName = simplifiedName.replace('Vamos', 'M+ Vamos');
+                        } else if (simplifiedName.includes('M ')) {
+                            simplifiedName = simplifiedName.replace('M ', 'M+ ');
+                        } else if (simplifiedName.includes('Eurosport')) {
+                            simplifiedName = simplifiedName.replace('Eurosport', '★EUROSPORT ');
+                        } else if (simplifiedName.includes('LaLiga')) {
+                            simplifiedName = simplifiedName.replace('LaLiga', 'La Liga');
+                        } else if (simplifiedName.includes('Premier')) {
+                            simplifiedName = simplifiedName.replace('Premier', 'Premier League');
+                        }
                         
                         // Extraer calidad del nombre si es posible
                         let quality = '720p';
@@ -942,7 +964,7 @@
                         numberedChannels.push({
                             id: acestreamId,
                             number: currentNumber.toString(),
-                            name: channelName,
+                            name: simplifiedName,
                             quality: quality,
                             multiAudio: multiAudio,
                             isKnown: true,
