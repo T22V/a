@@ -456,7 +456,7 @@
         const EVENTS_BACKUP_KEY = 'a4v_events_backup';
         const CHANNEL_HISTORY_KEY = 'a4v_channel_history';
         const BACKUP_EXPIRY_HOURS = 6;
-        const HISTORY_EXPIRY_HOURS = 168; // 1 semana
+        const HISTORY_EXPIRY_HOURS = 168;
         
         function saveChannelHistory(channels) {
             const history = {
@@ -495,7 +495,7 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            const isDarkMode = localStorage.getItem('darkMode') !== 'false'; // Por defecto modo oscuro
+            const isDarkMode = localStorage.getItem('darkMode') !== 'false';
             if (!isDarkMode) {
                 document.body.classList.add('light-mode');
                 document.getElementById('darkModeToggle').textContent = '🌙';
@@ -584,27 +584,16 @@
         }
 
         async function loadGistChannels() {
-            const enlacesGistUrl = "https://gist.githubusercontent.com/T22V/80b0b2d2e20ed0a455b66303b468e90b/raw";
             const infoGistUrl = "https://gist.githubusercontent.com/T22V/ab76c1aa6c6b90fb2a9ad38dc4a66210/raw";
+            const infoResponse = await fetch(infoGistUrl);
             
-            const [enlacesResponse, infoResponse] = await Promise.all([
-                fetch(enlacesGistUrl),
-                fetch(infoGistUrl)
-            ]);
-            
-            if (!enlacesResponse.ok) throw new Error("Error al obtener los enlaces Gist");
             if (!infoResponse.ok) throw new Error("Error al obtener la info de canales Gist");
+            const infoContent = await infoResponse.text();
             
-            const [enlacesContent, infoContent] = await Promise.all([
-                enlacesResponse.text(),
-                infoResponse.text()
-            ]);
-            
-            return processGistData(enlacesContent, infoContent);
+            return processGistData(infoContent);
         }
 
-        function processGistData(enlaces, infoCanales) {
-            const infoMap = {};
+        function processGistData(infoCanales) {
             const numberedChannels = [];
             
             infoCanales.split('\n').forEach(linea => {
@@ -613,64 +602,27 @@
                 
                 const parts = linea.split(',').map(part => part.trim());
                 
-                if (parts.length >= 4) {
+                if (parts.length >= 5) {
                     const num = parts[0];
                     const nombre = parts[1];
                     const calidad = parts[2] === 'N/A' ? '720p' : (parts[2] === '1080' ? '1080p' : parts[2]);
                     const multiaudio = parts[3] === 'Sí' || parts[3] === 'Sí,' || parts[3] === 'Yes';
+                    const acestreamId = parts[4].match(/acestream:\/\/([a-fA-F0-9]+)/)?.[1] || 
+                                       parts[4].match(/([a-fA-F0-9]{40})/)?.[1];
                     
-                    infoMap[num] = {
-                        nombre: nombre,
-                        calidad: calidad,
-                        multiaudio: multiaudio,
-                        isKnown: true
-                    };
-                    
-                    if (parseInt(num) >= 500 && parts.length >= 5 && parts[4]) {
-                        const acestreamId = parts[4].match(/acestream:\/\/([a-fA-F0-9]+)/)?.[1] || 
-                                           parts[4].match(/([a-fA-F0-9]{40})/)?.[1];
-                        
-                        if (acestreamId) {
-                            numberedChannels.push({
-                                id: acestreamId,
-                                number: num,
-                                name: nombre,
-                                quality: calidad,
-                                multiAudio: multiaudio,
-                                isKnown: true,
-                                source: 'special-gist' // Identificador para canales especiales
-                            });
-                        }
+                    if (acestreamId) {
+                        numberedChannels.push({
+                            id: acestreamId,
+                            number: num,
+                            name: nombre,
+                            quality: calidad,
+                            multiAudio: multiaudio,
+                            isKnown: true,
+                            source: 'gist'
+                        });
                     }
                 }
             });
-            
-            enlaces.split(/\n+/)
-                .filter(linea => linea.trim() !== "")
-                .forEach((linea, index) => {
-                    const numCanal = (index + 1).toString();
-                    if (parseInt(numCanal) < 500) {
-                        const info = infoMap[numCanal] || {
-                            nombre: `Canal ${numCanal}`,
-                            calidad: '720p',
-                            multiaudio: false,
-                            isKnown: false
-                        };
-
-                        const match = linea.match(/acestream:\?content_id=([a-fA-F0-9]+)/) || linea.match(/([a-fA-F0-9]{40})/);
-                        if (match && match[1]) {
-                            numberedChannels.push({
-                                id: match[1],
-                                number: numCanal,
-                                name: info.nombre,
-                                quality: info.calidad,
-                                multiAudio: info.multiaudio,
-                                isKnown: info.isKnown,
-                                source: 'gist' // Identificador para canales normales
-                            });
-                        }
-                    }
-                });
             
             return numberedChannels;
         }
@@ -689,7 +641,7 @@
                 const uniqueChannelsMap = new Map();
                 
                 channelsData.forEach(channel => {
-                    if (channel.source === 'gist' || channel.source === 'special-gist') {
+                    if (channel.source === 'gist') {
                         uniqueChannelsMap.set(channel.id, channel);
                     }
                 });
@@ -717,7 +669,7 @@
                     
                     const historicalChannels = loadChannelHistory();
                     if (historicalChannels && historicalChannels.length > 0) {
-                        const gistChannels = channelsData.filter(c => c.source === 'gist' || c.source === 'special-gist');
+                        const gistChannels = channelsData.filter(c => c.source === 'gist');
                         channelsData = [...gistChannels, ...historicalChannels];
                         renderChannels(channelsData);
                     }
@@ -919,7 +871,7 @@
             const doc = parser.parseFromString(htmlContent, 'text/html');
             const rows = doc.querySelectorAll('table tbody tr');
             
-            let currentNumber = 1000; // Empezamos desde 1000 para los eventos
+            let currentNumber = 1000;
             
             rows.forEach(row => {
                 const cells = row.querySelectorAll('td');
@@ -931,16 +883,13 @@
                         const acestreamId = link.href.split('://')[1];
                         let channelName = link.textContent.trim();
                         
-                        // Eliminar (OpXX) del nombre del canal
                         channelName = channelName.replace(/\s*\(Op\d+\)/g, '');
                         
-                        // Simplificar nombres específicos para eventos
                         let simplifiedName = channelName
                             .replace(/1080|720|UHD|MultiAudio|Multi Audio|\(.*?\)/g, '')
                             .replace(/\s+/g, ' ')
                             .trim();
 
-                        // Lógica específica para eventos
                         if (simplifiedName.includes('Vamos')) {
                             simplifiedName = simplifiedName.replace('Vamos', 'M+ Vamos');
                         } else if (simplifiedName.includes('M ')) {
@@ -953,12 +902,10 @@
                             simplifiedName = simplifiedName.replace('Premier', 'Premier League');
                         }
                         
-                        // Extraer calidad del nombre si es posible
                         let quality = '720p';
                         if (channelName.includes('1080')) quality = '1080p';
                         if (channelName.includes('UHD')) quality = 'UHD';
                         
-                        // Asumir que no hay multiaudio en estos eventos
                         const multiAudio = false;
                         
                         numberedChannels.push({
@@ -1085,12 +1032,10 @@
                 const sourceBadge = document.createElement("span");
                 sourceBadge.className = `source-badge ${
                     channel.source === 'elcano' ? 'elcano-badge' : 
-                    channel.source === 'special-gist' ? 'special-gist-badge' : 
                     channel.source === 'events' ? 'events-badge' : 'gist-badge'
                 }`;
                 sourceBadge.textContent = 
                     channel.source === 'elcano' ? 'EC' : 
-                    channel.source === 'special-gist' ? 'GS' : 
                     channel.source === 'events' ? 'EV' : 'NE';
                 card.appendChild(sourceBadge);
                 
